@@ -1,0 +1,10 @@
+[submodule "extlib/tlx"]
+	path = extlib/tlx
+	url = https://github.com/lorenzhs/tlx
+	branch = threadpool_init
+[submodule "extlib/Silo"]
+	path = extlib/Silo
+	url = https://github.com/stanford-mast/Silo
+[submodule "extlib/Topo"]
+	path = extlib/Topo
+	url = https://github.com/stanford-mast/Topo
