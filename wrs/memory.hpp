@@ -22,25 +22,11 @@ constexpr size_t align_size(size_t size, size_t alignment) {
     return ((size + alignment - 1) / alignment) * alignment;
 }
 
-void* alloc_hugepage(size_t size) {
-    constexpr bool debug = false;
-
-    constexpr size_t alignment = 2 * 1024 * 1024;
-    size_t bytes = align_size(size, alignment);
-    sLOG << "Allocating" << bytes << "bytes instead of" << size;
-    void* ptr = aligned_alloc(alignment, bytes);
-    madvise(ptr, bytes, MADV_HUGEPAGE);
-    return ptr;
-}
+// Allocate memory using huge pages
+void* alloc_hugepage(size_t size);
 
 // Allocate memory, using huge pages for allocations larger than 1MB
-void* allocate(size_t size) {
-    if (size >= 1024 * 1024) {
-        return alloc_hugepage(size);
-    } else {
-        return malloc(size);
-    }
-}
+void* allocate(size_t size);
 
 struct deallocator {
     template <typename T>
@@ -52,6 +38,12 @@ struct deallocator {
 // to avoid alloc-dealloc-mismatches
 template <typename T>
 using alloc_arr_ptr = std::unique_ptr<T[], deallocator>;
+
+template <typename T>
+alloc_arr_ptr<T> make_alloc_arr(size_t num_elems) {
+    T* ptr = static_cast<T*>(allocate(num_elems * sizeof(T)));
+    return alloc_arr_ptr<T>(ptr);
+}
 
 } // namespace wrs
 

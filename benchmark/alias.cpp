@@ -125,9 +125,9 @@ wrs::Aggregate<double> run_queries(
         wrs::timer timer;
 
         // Copy tables onto each NUMA node
-        std::vector<std::unique_ptr<alias_table>> tables(wrs::g_num_numa_nodes);
+        std::vector<std::unique_ptr<alias_table>> tables(wrs::get_num_nodes());
         // Only duplicate if >1 NUMA nodes
-        if (duplicate && wrs::g_num_numa_nodes > 1) {
+        if (duplicate && wrs::get_num_nodes() > 1) {
             wrs::do_per_numa_node(
                 [&tables, &table](int id) {
                     tables[id] = std::make_unique<alias_table>(table);
@@ -137,12 +137,12 @@ wrs::Aggregate<double> run_queries(
         double copy_duration = timer.get_and_reset();
 
         // Run queries in parallel
-        if (duplicate && wrs::g_num_numa_nodes > 1)
+        if (duplicate && wrs::get_num_nodes() > 1)
             wrs::parallel_do_range(
                 [&tables, &seed](size_t min, size_t max, int thread_id) {
                     const int numa_node = thread_id /
-                        (wrs::g_total_threads + wrs::g_num_numa_nodes - 1)
-                        / wrs::g_num_numa_nodes;
+                        (wrs::get_num_threads() + wrs::get_num_nodes() - 1)
+                        / wrs::get_num_nodes();
 
                     wrs::generators::select_t rng(seed + min + 1);
                     std::vector<typename alias_table::result_type> samples(1);

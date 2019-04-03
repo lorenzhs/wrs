@@ -36,6 +36,7 @@ namespace wrs {
 
 template <typename size_type = uint32_t>
 struct par_alias {
+    static constexpr const char* name = "parallel";
     static constexpr bool pass_rand = true;
     using result_type = size_type;
     // (prob_1, prob_2, item, alias_1, alias_2, iteration)
@@ -411,9 +412,16 @@ struct par_alias {
 #endif
     }
 
+    size_t size() const {
+        return size_;
+    }
 
     std::vector<double> get_timers() const {
         return timers_; // copy
+    }
+
+    double total_weight() const {
+        return W_;
     }
 
 protected:

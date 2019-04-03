@@ -84,6 +84,12 @@ public:
         return next() * max < cutoff;
     }
 
+    //! Binomial distribution
+    size_t next_binomial(size_t n, double p) {
+        std::binomial_distribution<> dist(n, p);
+        return dist(generator_);
+    }
+
     //! Generate a normally distributed value. This needs two uniform deviates,
     //! if you need more than one, look at next_two_gaussians.
     double next_gaussian(double mean, double stdev) {

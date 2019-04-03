@@ -18,79 +18,57 @@
 #include <topo.h>
 #endif
 
+#include <numeric>
 #include <thread>
 #include <vector>
 
 namespace wrs {
 
-int g_num_numa_nodes;
-int g_total_threads;
-std::vector<tlx::ThreadPool*> global_pools;
+void init_threads(int threads);
 
-void init_threads(int threads) {
-    g_total_threads = threads;
-#ifdef WRS_HAVE_NUMA
-    g_num_numa_nodes = topoGetSystemNUMANodeCount();
-    // if we're using less threads than we have numa nodes, cap number of nodes
-    g_num_numa_nodes = std::min(g_total_threads, g_num_numa_nodes);
-    int threads_per_node = (threads + g_num_numa_nodes - 1) / g_num_numa_nodes;
+int get_num_threads();
 
-    int min = 0, max = threads_per_node;
-    for (int i = 0; i < g_num_numa_nodes; i++) {
-        int num_threads = max - min;
-        sLOG1 << "Pool" << i << "has" << num_threads << "threads";
-        global_pools.push_back(new tlx::ThreadPool(
-                                   num_threads, [i]{ numa_run_on_node(i); }));
-        min = max;
-        max = std::min(threads, max + threads_per_node);
-    }
-#else
-    g_num_numa_nodes = 1;
-    global_pools.push_back(new tlx::ThreadPool(threads));
-#endif
-}
+int get_num_nodes();
 
-int get_num_threads() {
-    return g_total_threads;
-}
-
+tlx::ThreadPool* get_pool(size_t i);
 
 // Call function once on every NUMA node
 template <typename F>
 void do_per_numa_node(F&& callback) {
-    for (int i = 0; i < g_num_numa_nodes; i++) {
-        global_pools[i]->enqueue([callback, i]() { callback(i); });
+    for (int i = 0; i < get_num_nodes(); i++) {
+        get_pool(i)->enqueue([callback, i]() { callback(i); });
     }
-    for (int i = 0; i < g_num_numa_nodes; i++) {
-        if (global_pools[i]->size() > 0) {
-            global_pools[i]->loop_until_empty();
+    for (int i = 0; i < get_num_nodes(); i++) {
+        if (get_pool(i)->size() > 0) {
+            get_pool(i)->loop_until_empty();
         }
     }
 }
 
-
 template <typename F>
 void parallel_do_range(F&& callback, size_t max_, size_t min_ = 0) {
-    int num_threads = g_total_threads;
-    int threads_per_node = (num_threads + g_num_numa_nodes - 1) / g_num_numa_nodes;
+    int num_threads = get_num_threads();
+    int threads_per_node = (num_threads + get_num_nodes() - 1) / get_num_nodes();
     size_t elems_per_thread = (max_ - min_ + num_threads - 1) / num_threads;
     size_t min = min_, max = min_ + elems_per_thread;
 
     for (int i = 0; i < num_threads; i++) {
-        global_pools[i / threads_per_node]->enqueue(
+        get_pool(i / threads_per_node)->enqueue(
             [callback, min, max, i]() { callback(min, max, i); });
         min = max;
         max = std::min(max_, max + elems_per_thread);
+        // don't spawn empty threads
+        if (min == max_) break;
     }
-    for (int i = 0; i < g_num_numa_nodes; i++) {
-        if (global_pools[i]->size() > 0) {
-            global_pools[i]->loop_until_empty();
+    for (int i = 0; i < get_num_nodes(); i++) {
+        if (get_pool(i)->size() > 0) {
+            get_pool(i)->loop_until_empty();
         }
     }
 }
 
 template <typename F, typename G>
-void parallel_do(F&& init, G&& callback, size_t num_elems) {
+void parallel_do(F&& init, G&& callback, size_t max_, size_t min_ = 0) {
     auto worker = [&init, &callback](size_t min, size_t max, int thread_id)
         noexcept(noexcept(callback) && noexcept(init))
     {
@@ -100,7 +78,7 @@ void parallel_do(F&& init, G&& callback, size_t num_elems) {
             callback(state, i);
         }
     };
-    parallel_do_range(worker, num_elems);
+    parallel_do_range(worker, max_, min_);
 }
 
 template <typename F>
