@@ -3,5 +3,5 @@ set -e
 
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
-# run queries as well
-$DIR/run_alias.sh -n $((10**9)) -q $((10**7)) -i 10 -r 20 -s 11235813213455
+# no queries
+$DIR/run_alias.sh 8 -Q -i 20 -r 25 -s 11235813213455

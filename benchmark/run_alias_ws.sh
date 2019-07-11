@@ -5,18 +5,20 @@ echo "Usage: ./run_alias_ws.sh size-per-thread [other args for alias]"
 
 size=$1
 
-filename=wsresults_$(date "+%F.%H-%M-%S").txt
-linkname=wsresults.txt
+filename=/global_data/lorenz/wrs/wsresults_$(date "+%F.%H-%M-%S").txt
 
 echo "Invocation: $0 $*" | tee $filename
-echo "Running on $HOST on $(date)" | tee -a $filename
+echo "Running on $(hostname) on $(date)" | tee -a $filename
 
 # Sequential baseline for speedup calculation
-./benchmark/alias -M -P -n $size -t $threads 1 | tee -a $filename
-for threads in {1,2,3,4,5,6,8,10,12,16,20,24,28,32,40,48,56,60,64,72,80,100,120,140,160}
+# DEGS sequential, BLMOR parallel
+./benchmark/alias -B -L -M -O -R -D -n $size -t 1 ${@:2} | tee -a $filename
+for threads in {1,2,4,8,12,16,24,32,40,52,64,80,104,128,158}
 do
-    ./benchmark/alias -S -n $((size*threads)) -t $threads ${@:2} | tee -a $filename
+    # O and R are redundant (only affects query)
+    ./benchmark/alias -D -E -G -S -R -n $((size*threads)) -t $threads ${@:2} | tee -a $filename
 done
 
+linkname=/global_data/lorenz/wrs/wsresults.txt
 rm -f $linkname
 ln -s $filename $linkname

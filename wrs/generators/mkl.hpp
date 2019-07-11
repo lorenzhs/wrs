@@ -3,7 +3,7 @@
  *
  * Generate random deviates using Intel MKL
  *
- * Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+ * Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  ******************************************************************************/
 
 #pragma once
@@ -18,9 +18,12 @@
 #include <mkl.h>
 #include <mkl_vsl.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <utility>
+#include <vector>
 
 namespace wrs {
 namespace generators {
@@ -38,7 +41,7 @@ public:
     static const char* name;
 
     //! Initialize new MKL random generator
-    mkl(size_t seed) {
+    explicit mkl(size_t seed) {
         vslNewStream(&stream, VSL_BRNG_SFMT19937, seed);
     }
 
@@ -72,23 +75,33 @@ public:
         return 512; // chosen by fair guess?
     }
 
-    //! Generate `size` uniform doubles from [0, 1)
-    void generate_block(std::vector<double> &output, size_t size) {
+    //! Generate `size` uniform doubles from [0, 1) or approximately (0, 1] if
+    //! left_open is set
+    void generate_block(std::vector<double> &output, size_t size,
+                        bool left_open = false) {
         check_size(size);
         if (size > output.size()) {
             output.resize(size);
         }
-        generate_block(output.data(), size);
+        generate_block(output.data(), size, left_open);
     }
 
-    //! Generate `size` uniform doubles from [0, 1)
-    void generate_block(double *ptr, size_t size) {
+    //! Generate `size` uniform doubles from [0, 1) or approximately (0, 1] if
+    //! left_open is set
+    void generate_block(double *ptr, size_t size, bool left_open = false) {
         check_size(size);
 
         MKL_INT count = static_cast<MKL_INT>(size);
-        // VSL_RNG_METHOD_UNIFORM_STD_ACCURATE?
-        int status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream,
+        int status;
+        if (left_open) {
+            double min = 1e-15; // still got elements == 0 with min = 1e-16
+            double max = std::nextafter<double>(1.0, 2.0);
+            status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream,
+                                  count, ptr, min, max);
+        } else {
+            status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream,
                                   count, ptr, 0.0, 1.0);
+        }
         CheckVslError(status);
     }
 

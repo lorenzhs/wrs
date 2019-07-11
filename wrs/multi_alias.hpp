@@ -3,7 +3,7 @@
  *
  * Shared memory implementation of the simple distributed algorithm
  *
- * Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+ * Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  ******************************************************************************/
 
 #pragma once
@@ -22,13 +22,17 @@
 #include <memory>
 #include <numeric>
 #include <utility>
+#include <vector>
 
 namespace wrs {
 
-template <typename size_type = uint32_t>
+template <template <typename> typename b_alias_type, typename size_type = uint32_t>
 struct multi_alias {
-    static constexpr bool pass_rand = true;
-    using alias_type = alias<size_type>;
+    static constexpr const char* name = "multi";
+    static constexpr bool yields_single_sample = true;
+    static constexpr bool init_with_seed = false;
+    static constexpr int pass_rand = 2;
+    using alias_type = b_alias_type<size_type>;
     using result_type = size_type;
 
     static_assert((sizeof(double) / sizeof(size_type)) * sizeof(size_type) == sizeof(double),
@@ -37,7 +41,7 @@ struct multi_alias {
     static constexpr bool debug = false;
     static constexpr bool time = false;
 
-    static constexpr double eps = 1e-6;
+    static constexpr double eps = 1e-7;
 
     multi_alias() {}
 
@@ -46,6 +50,13 @@ struct multi_alias {
         init(w_end - w_begin);
         construct(w_begin, w_end);
     }
+
+    multi_alias & operator = (const multi_alias &) = default;
+    multi_alias(const multi_alias &) = default;
+    //! delete move-constructor
+    multi_alias(multi_alias &&) = delete;
+    //! delete move-assignment
+    multi_alias & operator = (multi_alias &&) = delete;
 
     void init(size_t size) {
         num_subtables_ = get_num_threads();
@@ -103,38 +114,49 @@ struct multi_alias {
                    << timers_.back() << "ms";
     }
 
-    size_type sample(double uniform) const {
-        double rand = uniform * num_subtables_;
-        size_t subtable = rand;
+    size_type sample(double uniform1, double uniform2) const {
+        size_type subtable = top_level_.sample(uniform1);
         size_t offset = subtable_offsets_[subtable];
-        double remaining_rand = rand - subtable;
-        return offset + subtables_[subtable].sample(remaining_rand);
+        assert(subtables_[subtable].size() != static_cast<size_t>(-1));
+        return offset + subtables_[subtable].sample(uniform2);
     }
 
-    template <typename Iterator>
-    void verify(Iterator begin, Iterator end) const {
-        (void) begin;
-        (void) end;
-#ifndef NDEBUG
-        assert(end - begin == static_cast<ssize_t>(size_));
-        std::vector<double> weights(size_);
+    // Sum up all weights in the subtables
+    void verify_helper(std::vector<double> &weights, size_t offset) const {
         for (size_t i = 0; i < num_subtables_; ++i) {
-            subtables_[i].verify_helper(weights, subtable_offsets_[i]);
+            subtables_[i].verify_helper(weights, offset + subtable_offsets_[i]);
         }
+    }
 
-        for (size_t i = 0; i < size_; ++i) {
-            double should = *(begin + i);
-            double have = weights[i];
-            assert(std::abs(should - have) < eps);
-        }
-        LOG1 << "Verification succeeded!";
-#endif
+    size_t size() const {
+        return size_;
     }
 
     std::vector<double> get_timers() const {
         return timers_;
     }
 
+    double total_weight() const {
+        return top_level_.total_weight();
+    }
+
+
+    template <typename Callback>
+    void find(size_type item, Callback && callback) const {
+        for (size_t table = 0; table < num_subtables_; ++table) {
+            size_type offset = subtable_offsets_[table];
+            if (item < offset) continue;
+
+            auto cb =
+                [&](int, size_type idx, double w, auto &tableitem) {
+                    callback(table, idx + offset, w, tableitem);
+                };
+            subtables_[table].find(item - offset, cb);
+
+            if (table + 1 < num_subtables_ && item < subtable_offsets_[table + 1])
+                break;
+        }
+    }
 
 protected:
     size_t num_subtables_, size_;

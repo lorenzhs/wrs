@@ -221,7 +221,7 @@ static inline size_t size_stack(const gsl_stack_t *s)
 
 /*** Begin Walker's Algorithm ***/
 
-gsl_ran_discrete_t *
+double
 my_gsl_ran_discrete_preproc(size_t Kevents, const double *ProbArray,
                             gsl_ran_discrete_t *g, double *E,
                             gsl_stack_t *Bigs, gsl_stack_t *Smalls)
@@ -316,7 +316,7 @@ my_gsl_ran_discrete_preproc(size_t Kevents, const double *ProbArray,
     }
 #endif
 
-    return g;
+    return pTotal;
 }
 
 } // extern "C"

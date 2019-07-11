@@ -57,16 +57,22 @@
 #include <tlx/logger.hpp>
 #include <tlx/define.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <utility>
 #include <vector>
+
+#if defined(__SSE2__)
+#define WRS_HAVE_SSE2
+#endif
 
 
 #include <inttypes.h>
 #if defined(HAVE_ALTIVEC) && !defined(__APPLE__)
 #  include <altivec.h>
-#elif defined(SAMPLING_HAVE_SSE2)
+#elif defined(WRS_HAVE_SSE2)
 #  include <emmintrin.h>
 #endif
 
@@ -163,7 +169,7 @@ union W128_T {
     double d[2];
 };
 
-#elif defined(SAMPLING_HAVE_SSE2)
+#elif defined(WRS_HAVE_SSE2)
 //#  include <emmintrin.h>
 
 /** 128-bit data structure */
@@ -193,6 +199,7 @@ struct DSFMT_T {
 };
 typedef struct DSFMT_T dsfmt_t;
 
+void dsfmt_fill_array_open_close(dsfmt_t *dsfmt, double array[], int size);
 void dsfmt_fill_array_close_open(dsfmt_t *dsfmt, double array[], int size);
 void dsfmt_chk_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed, int mexp);
 int dsfmt_get_min_array_size(void);
@@ -215,7 +222,7 @@ inline static void dsfmt_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed) {
 #define DSFMT_SR	12
 
 /* for sse2 */
-#if defined(SAMPLING_HAVE_SSE2)
+#if defined(WRS_HAVE_SSE2)
   #define SSE2_SHUFF 0x1b
 #elif defined(HAVE_ALTIVEC)
   #if defined(__APPLE__)  /* For OSX */
@@ -277,7 +284,7 @@ inline static void dsfmt_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed) {
  * inlined: dSFMT-common.h
  */
 
-#if defined(SAMPLING_HAVE_SSE2)
+#if defined(WRS_HAVE_SSE2)
 //#  include <emmintrin.h>
 union X128I_T {
     uint64_t u[2];
@@ -320,7 +327,7 @@ inline static void do_recursion(w128_t *r, w128_t *a, w128_t * b,
     r->s = vec_xor(z, x);
     lung->s = w;
 }
-#elif defined(SAMPLING_HAVE_SSE2)
+#elif defined(WRS_HAVE_SSE2)
 /**
  * This function represents the recursion formula.
  * @param r output 128-bit
@@ -380,7 +387,7 @@ public:
     static constexpr bool debug = true;
     static const char* name;
 
-    dSFMT(size_t seed) : index_(0), block_size_(0), block_id_(0) {
+    explicit dSFMT(size_t seed) : index_(0), block_size_(0), block_id_(0) {
         _dSFMT::dsfmt_init_gen_rand(&dsfmt_, seed);
     }
 
@@ -413,8 +420,9 @@ public:
         return minimum_block_size();
     }
 
-    //! Generate `size` [0,1) doubles in `output`
-    void generate_block(std::vector<double> &output, size_t size)
+    //! Generate `size` [0,1) doubles in `output` or (0, 1] if left_open is set
+    void generate_block(std::vector<double> &output, size_t size,
+                        bool left_open = false)
     {
         // Ensure minimum block size (normally 382)
         const size_t min_size = _dSFMT::dsfmt_get_min_array_size();
@@ -427,11 +435,14 @@ public:
         if (size > output.size()) {
             output.resize(size);
         }
-        _dSFMT::dsfmt_fill_array_close_open(&dsfmt_, output.data(), size);
+        if (left_open)
+            _dSFMT::dsfmt_fill_array_open_close(&dsfmt_, output.data(), size);
+        else
+            _dSFMT::dsfmt_fill_array_close_open(&dsfmt_, output.data(), size);
     }
 
-    //! Generate `size` [0,1) doubles in `output`
-    void generate_block(double *arr, size_t size) {
+    //! Generate `size` [0,1) doubles in `output` or (0, 1] if left_open is set
+    void generate_block(double *arr, size_t size, bool left_open = false) {
         constexpr bool debug = false;
 
         // Ensure minimum block size (normally 382)
@@ -445,7 +456,10 @@ public:
             return;
         }
 
-        _dSFMT::dsfmt_fill_array_close_open(&dsfmt_, arr, size);
+        if (left_open)
+            _dSFMT::dsfmt_fill_array_open_close(&dsfmt_, arr, size);
+        else
+            _dSFMT::dsfmt_fill_array_close_open(&dsfmt_, arr, size);
     }
 
     //! Get a single [0,1) double. Computes increasingly large blocks internally

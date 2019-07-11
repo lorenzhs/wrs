@@ -4,14 +4,10 @@
 # Root CMake build script for sampler
 #
 # Copyright (C) 2015-2017 Timo Bingmann <tb@panthema.net>
-# Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+# Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
 ################################################################################
 
-cmake_minimum_required(VERSION 3.1...3.12)
-
-if(${CMAKE_VERSION} VERSION_LESS 3.12)
-    cmake_policy(VERSION ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION})
-endif()
+cmake_minimum_required(VERSION 3.9.2...3.13)
 
 # custom cmake scripts
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -32,7 +28,7 @@ endif()
 
 
 option(WRS_USE_LTO
-  "Compile with -flto (link-time optimization)." OFF)
+  "Compile with -flto (link-time optimization)." ON)
 
 option(WRS_USE_MKL
   "Build with Intel MKL random generator if available." ON)
@@ -47,7 +43,6 @@ option(WRS_USE_GSL
 ################################################################################
 
 # variables to collect compile-time definitions, include dirs, and libraries
-set(WRS_DEFINITIONS "")
 set(WRS_INCLUDE_DIRS "")
 set(WRS_LINK_LIBRARIES "")
 set(EXEC_LINK_LIBRARIES "wrs")
@@ -57,13 +52,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(NOT MSVC)
-  # Debug builds should use -Og instead of -O0, if available
-  include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag("-Og" WRS_HAS_OG)
-  if(WRS_HAS_OG)
-    set(CMAKE_CXX_FLAGS_DEBUG "-Og -g")
-  endif()
-
   # Require pthread
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
@@ -77,6 +65,7 @@ if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wpedantic")
 
   # enable -march=native on Debug and Release builds
+  include(CheckCXXCompilerFlag)
   check_cxx_compiler_flag("-march=native" WRS_HAS_MARCH_NATIVE)
   if(WRS_HAS_MARCH_NATIVE)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -123,8 +112,14 @@ if(NOT MSVC)
   endif()
   # enable extra warnings on clang
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # Use -Og on clang (on gcc, it optimises away too much)
+    check_cxx_compiler_flag("-Og" WRS_HAS_OG)
+    if(WRS_HAS_OG)
+      set(CMAKE_CXX_FLAGS_DEBUG "-Og -g")
+    endif()
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated")
+    #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wdeprecated")
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wabstract-vbase-init")
   endif()
 
@@ -174,45 +169,15 @@ elseif(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4250")
   # warning C4503: decorated name length exceeded, name was truncated
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4503")
-  # disable lots of warnings about "unsecure" C runtime function
-  list(APPEND WRS_DEFINITIONS "_CRT_SECURE_NO_WARNINGS")
-  # disable "The POSIX name for this item is deprecated. Instead, use the ISO C
-  # and C++ conformant name.", Nope. We will not.
-  list(APPEND WRS_DEFINITIONS "_CRT_NONSTDC_NO_DEPRECATE")
-  # disable lots of warnings about "unsecure" STL functions
-  list(APPEND WRS_DEFINITIONS "_SCL_SECURE_NO_WARNINGS")
-  # windef.h bizzarly defines min and max as macros, unless this is defined.
-  list(APPEND WRS_DEFINITIONS "NOMINMAX")
 endif()
 
 
 if(WRS_USE_LTO)
   # build with link-time optimization
-  include(CheckCXXCompilerFlag)
-  check_cxx_compiler_flag(-flto CXX_HAS_LTO_FLAG)
-
-  if(CMAKE_BUILD_TYPE MATCHES Release AND CXX_HAS_LTO_FLAG)
-    find_program(CMAKE_GCC_AR
-      NAMES ${_CMAKE_TOOLCHAIN_PREFIX}gcc-ar${_CMAKE_TOOLCHAIN_SUFFIX}
-      HINTS ${_CMAKE_TOOLCHAIN_LOCATION})
-
-    find_program(CMAKE_GCC_NM
-      NAMES ${_CMAKE_TOOLCHAIN_PREFIX}gcc-nm
-      HINTS ${_CMAKE_TOOLCHAIN_LOCATION})
-
-    find_program(CMAKE_GCC_RANLIB
-      NAMES ${_CMAKE_TOOLCHAIN_PREFIX}gcc-ranlib
-      HINTS ${_CMAKE_TOOLCHAIN_LOCATION})
-
-    if(CMAKE_GCC_AR AND CMAKE_GCC_NM AND CMAKE_GCC_RANLIB)
-      set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -flto")
-      set(CMAKE_AR "${CMAKE_GCC_AR}")
-      set(CMAKE_NM "${CMAKE_GCC_NM}")
-      set(CMAKE_RANLIB "${CMAKE_GCC_RANLIB}")
-    else()
-      message(WARNING "GCC indicates LTO support, but binutils wrappers could not be found. Disabling LTO.")
-    endif()
-  endif()
+  include(CheckIPOSupported)
+  check_ipo_supported()
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  set(TLX_USE_LTO ON CACHE BOOL "enable LTO for tlx")
 endif()
 
 if(APPLE)
@@ -249,12 +214,20 @@ endif()
 add_subdirectory(extlib/tlx)
 set(WRS_LINK_LIBRARIES tlx ${WRS_LINK_LIBRARIES})
 
+# use stocc
+list(APPEND WRS_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/extlib/stocc)
+
+# use stocc asmlib
+add_library(stocc_asm STATIC IMPORTED)
+set_target_properties(stocc_asm PROPERTIES IMPORTED_LOCATION
+  ${CMAKE_CURRENT_SOURCE_DIR}/extlib/stocc/libaelf64.a)
+set(WRS_LINK_LIBRARIES stocc_asm ${WRS_LINK_LIBRARIES})
 
 # try to find libnuma
 if(WRS_USE_NUMA)
   find_package(Numa)
   if(NUMA_FOUND)
-    list(APPEND WRS_DEFINITIONS "WRS_HAVE_NUMA")
+    add_definitions(-DWRS_HAVE_NUMA)
 
     # use Silo & Topo
     add_subdirectory(extlib)
@@ -270,7 +243,7 @@ endif()
 if(WRS_USE_GSL)
   find_package(GSL)
   if(GSL_FOUND)
-    list(APPEND WRS_DEFINITIONS "WRS_HAVE_GSL")
+    add_definitions(-DWRS_HAVE_GSL)
     set(WRS_LINK_LIBRARIES GSL::gsl ${WRS_LINK_LIBRARIES})
   else()
     message(STATUS "Could not find GSL, no problem, not building that")
@@ -282,7 +255,7 @@ if(WRS_USE_MKL)
   find_package(MKL)
   if(MKL_FOUND)
     #message(STATUS "Found MKL: ${MKL_ROOT_DIR}")
-    list(APPEND WRS_DEFINITIONS "WRS_HAVE_MKL")
+    add_definitions(-DWRS_HAVE_MKL)
     list(APPEND WRS_INCLUDE_DIRS ${MKL_INCLUDE_DIR})
     list(APPEND EXEC_LINK_LIBRARIES ${MKL_LP_LIBRARY} ${MKL_CORE_LIBRARY} ${MKL_SEQUENTIAL_LIBRARY})
   else()
@@ -291,24 +264,30 @@ if(WRS_USE_MKL)
 endif()
 
 ################################################################################
-### Build Macros
+### Define source files
 
-# macro for building main programs with correct libraries
-macro(do_build TARGETNAME)
-  add_executable(${TARGETNAME} ${ARGN})
-  target_link_libraries(${TARGETNAME} ${EXEC_LINK_LIBRARIES})
-endmacro(do_build)
-
-# macro for building a single-source program
-macro(build_prog PROGNAME)
-  string(REPLACE "/" "_" TARGETNAME "${PROGNAME}") # replace slashes
-  do_build(${TARGETNAME} ${PROGNAME}.cpp ${ARGN})
-endmacro(build_prog)
+# glob general sources
+file(GLOB_RECURSE WRS_SOURCES "${PROJECT_SOURCE_DIR}/wrs/*.[ch]pp")
+file(GLOB_RECURSE EXECUTABLES "${PROJECT_SOURCE_DIR}/benchmark/*.cpp")
 
 ################################################################################
+### Build library
 
-add_subdirectory(wrs)
+add_library(wrs STATIC ${WRS_SOURCES})
+set_target_properties(wrs PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(wrs PUBLIC ${PROJECT_SOURCE_DIR})
+target_include_directories(wrs SYSTEM PUBLIC ${WRS_INCLUDE_DIRS})
+target_link_libraries(wrs ${WRS_LINK_LIBRARIES})
 
-add_subdirectory(benchmark)
+################################################################################
+### Build all the executables
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/benchmark")
+foreach(target ${EXECUTABLES})
+  get_filename_component(target_name ${target} NAME_WE)
+  add_executable(${target_name} ${target})
+  target_link_libraries(${target_name} ${EXEC_LINK_LIBRARIES})
+endforeach(target)
+unset(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
 
 ################################################################################

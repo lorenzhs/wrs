@@ -65,13 +65,13 @@ extern "C" {
   ----------------*/
 inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array,
 				       int size);
+inline static void gen_rand_array_o0c1(dsfmt_t *dsfmt, w128_t *array,
+				       int size);
 inline static int idxof(int i);
 static void initial_mask(dsfmt_t *dsfmt);
 static void period_certification(dsfmt_t *dsfmt);
 
-#if defined(SAMPLING_HAVE_SSE2)
-/** 1 in 64bit for sse2 */
-static const union X128I_T sse2_int_one = {{1, 1}};
+#if defined(WRS_HAVE_SSE2)
 /** 2.0 double for sse2 */
 static const union X128D_T sse2_double_two = {{2.0, 2.0}};
 /** -1.0 double for sse2 */
@@ -92,7 +92,7 @@ inline static int idxof(int i) {
 }
 #endif
 
-#if defined(SAMPLING_HAVE_SSE2)
+#if defined(WRS_HAVE_SSE2)
 /**
  * This function converts the double precision floating point numbers which
  * distribute uniformly in the range [1, 2) to those which distribute uniformly
@@ -101,6 +101,15 @@ inline static int idxof(int i) {
  */
 inline static void convert_c0o1(w128_t *w) {
     w->sd = _mm_add_pd(w->sd, sse2_double_m_one.d128);
+}
+/**
+ * This function converts the double precision floating point numbers which
+ * distribute uniformly in the range [1, 2) to those which distribute uniformly
+ * in the range (0, 1].
+ * @param w 128bit stracture of double precision floating point numbers (I/O)
+ */
+inline static void convert_o0c1(w128_t *w) {
+    w->sd = _mm_sub_pd(sse2_double_two.d128, w->sd);
 }
 #else /* standard C and altivec */
 /**
@@ -112,6 +121,16 @@ inline static void convert_c0o1(w128_t *w) {
 inline static void convert_c0o1(w128_t *w) {
     w->d[0] -= 1.0;
     w->d[1] -= 1.0;
+}
+/**
+ * This function converts the double precision floating point numbers which
+ * distribute uniformly in the range [1, 2) to those which distribute uniformly
+ * in the range (0, 1].
+ * @param w 128bit stracture of double precision floating point numbers (I/O)
+ */
+inline static void convert_o0c1(w128_t *w) {
+    w->d[0] = 2.0 - w->d[0];
+    w->d[1] = 2.0 - w->d[1];
 }
 #endif
 
@@ -157,6 +176,51 @@ inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array,
     }
     dsfmt->status[DSFMT_N] = lung;
 }
+
+
+/**
+ * This function fills the user-specified array with double precision
+ * floating point pseudorandom numbers of the IEEE 754 format.
+ * @param dsfmt dsfmt state vector.
+ * @param array an 128-bit array to be filled by pseudorandom numbers.
+ * @param size number of 128-bit pseudorandom numbers to be generated.
+ */
+inline static void gen_rand_array_o0c1(dsfmt_t *dsfmt, w128_t *array,
+				       int size) {
+    int i, j;
+    w128_t lung;
+
+    lung = dsfmt->status[DSFMT_N];
+    do_recursion(&array[0], &dsfmt->status[0], &dsfmt->status[DSFMT_POS1],
+		 &lung);
+    for (i = 1; i < DSFMT_N - DSFMT_POS1; i++) {
+	do_recursion(&array[i], &dsfmt->status[i],
+		     &dsfmt->status[i + DSFMT_POS1], &lung);
+    }
+    for (; i < DSFMT_N; i++) {
+	do_recursion(&array[i], &dsfmt->status[i],
+		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+    }
+    for (; i < size - DSFMT_N; i++) {
+	do_recursion(&array[i], &array[i - DSFMT_N],
+		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+	convert_o0c1(&array[i - DSFMT_N]);
+    }
+    for (j = 0; j < 2 * DSFMT_N - size; j++) {
+	dsfmt->status[j] = array[j + size - DSFMT_N];
+    }
+    for (; i < size; i++, j++) {
+	do_recursion(&array[i], &array[i - DSFMT_N],
+		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+	dsfmt->status[j] = array[i];
+	convert_o0c1(&array[i - DSFMT_N]);
+    }
+    for (i = size - DSFMT_N; i < size; i++) {
+	convert_o0c1(&array[i]);
+    }
+    dsfmt->status[DSFMT_N] = lung;
+}
+
 
 /**
  * This function initializes the internal state array to fit the IEEE
@@ -232,6 +296,24 @@ int dsfmt_get_min_array_size(void) {
 
 /**
  * This function generates double precision floating point
+ * pseudorandom numbers which distribute in the range (0, 1] to the
+ * specified array[] by one call. This function is the same as
+ * fill_array_close1_open2() except the distribution range.
+ *
+ * @param dsfmt dsfmt state vector.
+ * @param array an array where pseudorandom numbers are filled
+ * by this function.
+ * @param size the number of pseudorandom numbers to be generated.
+ * see also \sa fill_array_close1_open2()
+ */
+void dsfmt_fill_array_open_close(dsfmt_t *dsfmt, double array[], int size) {
+    assert(size % 2 == 0);
+    assert(size >= DSFMT_N64);
+    gen_rand_array_o0c1(dsfmt, reinterpret_cast<w128_t*>(array), size / 2);
+}
+
+/**
+ * This function generates double precision floating point
  * pseudorandom numbers which distribute in the range [0, 1) to the
  * specified array[] by one call. This function is the same as
  * fill_array_close1_open2() except the distribution range.
@@ -245,7 +327,7 @@ int dsfmt_get_min_array_size(void) {
 void dsfmt_fill_array_close_open(dsfmt_t *dsfmt, double array[], int size) {
     assert(size % 2 == 0);
     assert(size >= DSFMT_N64);
-    gen_rand_array_c0o1(dsfmt, (w128_t *)array, size / 2);
+    gen_rand_array_c0o1(dsfmt, reinterpret_cast<w128_t*>(array), size / 2);
 }
 
 #if defined(__INTEL_COMPILER)

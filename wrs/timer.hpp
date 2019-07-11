@@ -1,7 +1,7 @@
 /*******************************************************************************
  * wrs/timer.hpp
  *
- * Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+ * Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  ******************************************************************************/
 
 #pragma once

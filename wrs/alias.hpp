@@ -3,31 +3,39 @@
  *
  * Alias method implementations
  *
- * Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+ * Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  ******************************************************************************/
 
 #pragma once
 #ifndef WRS_ALIAS_HEADER
 #define WRS_ALIAS_HEADER
 
+#include <wrs/accumulate.hpp>
 #include <wrs/memory.hpp>
 #include <wrs/timer.hpp>
+#include <wrs/util.hpp>
+#include <wrs/verify.hpp>
 
 #include <tlx/define.hpp>
 #include <tlx/logger.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <numeric>
 #include <utility>
+#include <vector>
 
 namespace wrs {
 
 template <typename size_type = uint32_t>
 struct alias {
-    static constexpr bool pass_rand = true;
+    static constexpr const char* name = "alias";
+    static constexpr bool yields_single_sample = true;
+    static constexpr bool init_with_seed = false;
+    static constexpr int pass_rand = 1;
     using result_type = size_type;
     using pair = std::pair<size_type, double>;
 
@@ -52,7 +60,7 @@ struct alias {
     static constexpr bool debug = false;
     static constexpr bool time = false;
 
-    alias() : table_(nullptr), work_(nullptr), size_(-1) {}
+    alias() : table_(nullptr), work_(nullptr), size_(-1), W_(0) {}
 
     template <typename Iterator>
     alias(Iterator w_begin, Iterator w_end) {
@@ -63,10 +71,14 @@ struct alias {
     alias & operator = (const alias & other) {
         LOG0 << "alias copy assignment/constructor called";
         size_ = other.size_;
-        const size_t num_bytes = size_ * sizeof(tableitem);
-        tableitem* table = (tableitem*)allocate(num_bytes);
-        memcpy(table, other.table_.get(), num_bytes);
-        table_ = alloc_arr_ptr<tableitem>(table);
+        W_ = other.W_;
+        W_n_ = other.W_n_;
+        if (size_ != static_cast<size_t>(-1)) {
+            table_ = make_alloc_arr<tableitem>(size_);
+            memcpy(table_.get(), other.table_.get(), size_ * sizeof(tableitem));
+        } else {
+            table_ = nullptr;
+        }
         timers_ = other.timers_;
         return *this;
     }
@@ -79,12 +91,8 @@ struct alias {
     alias & operator = (alias &&) = delete;
 
     void init(size_t size) {
-        tableitem* table = (tableitem*)allocate(size * sizeof(tableitem));
-        table_ = alloc_arr_ptr<tableitem>(table);
-
-        pair* work = (pair*)allocate(size * sizeof(pair));
-        work_ = alloc_arr_ptr<pair>(work);
-
+        table_ = make_alloc_arr<tableitem>(size);
+        work_ = make_alloc_arr<pair>(size);
         size_ = size;
     }
 
@@ -103,7 +111,7 @@ struct alias {
         }
         timers_.clear();
 
-        W_ = std::accumulate(begin, end, 0.0);
+        W_ = wrs::accumulate(begin, end, 0.0);
         W_n_ = W_ / size_;
         LOG << "W = " << W_ << ", W/n = " << W_n_;
         timers_.push_back(t.get_and_reset());
@@ -128,7 +136,7 @@ struct alias {
         auto s_begin = work_.get(), s_end = work_.get() + i_small,
             l_begin = s_end, l_end = work_.get() + size_,
             small = s_begin, large = l_begin;
-        LOG << std::vector<pair>{work_.get(), work_.get() + size_};
+        LOG_ARR(work_.get(), "work");
         while (small != s_end && large != l_end) {
             LOG << "table_[" << small->first << "] = (" << small->second
                 << ", " << small->first << ", " << large->first << ")";
@@ -175,6 +183,7 @@ struct alias {
 
     // Query given a uniformly distributed [0,1) random value
     size_type sample(double uniform) const {
+        assert(size_ != static_cast<size_t>(-1));
         double rand = uniform * size_;
         size_t index = rand;
         tableitem& item = table_[index];
@@ -193,20 +202,12 @@ struct alias {
     // Sum up all weights in the table, adding `offset` to every item ID.
     // This is used internally by verify() and by multi_alias' verify()
     void verify_helper(std::vector<double> &weights, size_t offset) const {
-        for (size_t i = 0; i < size_; i++) {
-            auto [p, i1, i2] = table_[i];
-            assert(p > 0);
-            assert(i1 != static_cast<size_type>(-1));
-            weights[offset + i1] += p;
-            if (p < W_n_) {
-                assert(i2 != static_cast<size_type>(-1));
-                weights[offset + i2] += W_n_ - p;
-            }
-        }
+        wrs::sum_tritable<size_type>(
+            table_.get(), size_, W_, W_n_, weights, offset);
     }
 
     template <typename Iterator>
-    void verify(Iterator begin, Iterator end) {
+    void verify(Iterator begin, Iterator end) const {
         (void) begin;
         (void) end;
 #ifndef NDEBUG
@@ -214,16 +215,10 @@ struct alias {
         std::vector<double> weights(size_);
         verify_helper(weights, 0);
         if (size_ < 100) {
-            LOG << "table: " << std::vector<tableitem>(
-                table_.get(), table_.get() + size_);
+            LOG_ARR(table_.get(), "table");
             LOG << "reconstructed: " << weights;
         }
-        for (size_t i = 0; i < size_; ++i) {
-            double should = *(begin + i);
-            double have = weights[i];
-            assert(std::abs(should - have) < W_ * 1e-10);
-        }
-        LOG << "Verification succeeded!";
+        wrs::check_weights(begin, end, weights, *this);
 #endif
     }
 
@@ -235,10 +230,25 @@ struct alias {
         return W_;
     }
 
+    size_t size() const {
+        return size_;
+    }
+
+    template <typename Callback>
+    void find(size_type item, Callback && callback) const {
+        for (size_t i = 0; i < size_; i++) {
+            if (table_[i].i == item) {
+                callback(0, i, table_[i].p, table_[i]);
+            } else if (table_[i].a == item) {
+                callback(0, i, W_n_ - table_[i].p, table_[i]);
+            }
+        }
+    }
+
 protected:
 
     TLX_ATTRIBUTE_ALWAYS_INLINE
-    bool is_small(double& d) const {
+    bool is_small(const double& d) const {
         return d <= W_n_;
     }
 

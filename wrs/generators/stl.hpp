@@ -3,16 +3,21 @@
  *
  * Generate random deviates using the STL
  *
- * Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
+ * Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  ******************************************************************************/
 
 #pragma once
 #ifndef WRS_GENERATORS_STL_HEADER
 #define WRS_GENERATORS_STL_HEADER
 
+#include <tlx/define.hpp>
+
 #include <cassert>
+#include <cmath>
+#include <limits>
 #include <random>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace wrs {
@@ -27,12 +32,22 @@ public:
     using generator_t = Generator;
 
     //! Initialize new stl random generator
-    stl(size_t seed) : generator_(seed) {}
+    explicit stl(size_t seed)
+        : generator_(seed == 0 ? std::random_device{}() : seed)
+        , uniform_double_left_open_(std::numeric_limits<double>::min(),
+                                    std::nextafter<double>(1.0, 2.0))
+    {}
 
-    //! non-copyable: delete copy-constructor
-    stl(const stl &) = delete;
-    //! non-copyable: delete assignment operator
-    stl & operator = (const stl &) = delete;
+    stl(const stl & other)
+        : generator_(other.generator_)
+        , uniform_double_left_open_(std::numeric_limits<double>::min(),
+                                    std::nextafter<double>(1.0, 2.0))
+    {}
+
+    stl & operator = (const stl &other) {
+        generator_ = other.generator_;
+        return *this;
+    }
     //! move-constructor: default
     stl(stl &&) = default;
     //! move-assignment operator: default
@@ -40,6 +55,7 @@ public:
 
     //! Re-seed the random generator
     void seed(size_t seed) {
+        if (seed == 0) seed = std::random_device{}();
         generator_.seed(seed);
     }
 
@@ -57,6 +73,11 @@ public:
     //! Generate a uniform double from [0, 1)
     double next() {
         return uniform_double_(generator_);
+    }
+
+    //! Generate a uniform double from (0, 1]
+    double next_left_open() {
+        return uniform_double_left_open_(generator_);
     }
 
     double next_exponential(double lambda) {
@@ -84,6 +105,12 @@ public:
         return next() * max < cutoff;
     }
 
+    //! Binomial distribution
+    size_t next_binomial(size_t n, double p) {
+        std::binomial_distribution<> dist(n, p);
+        return dist(generator_);
+    }
+
     //! Generate a normally distributed value. This needs two uniform deviates,
     //! if you need more than one, look at next_two_gaussians.
     double next_gaussian(double mean, double stdev) {
@@ -109,20 +136,27 @@ public:
         }
     }
 
-    //! Generate `size` uniform doubles from [0, 1)
-    void generate_block(std::vector<double> &output, size_t size) {
+    //! Generate `size` uniform doubles from [0, 1) or approximately (0, 1] if
+    //! left_open is set
+    void generate_block(std::vector<double> &output, size_t size,
+                        bool left_open = false) {
         if (size > output.size()) {
             output.resize(size);
         }
-        for (size_t i = 0; i < size; ++i) {
-            output[i] = next();
-        }
+        generate_block(output.data(), size, left_open);
     }
 
-    //! Generate `size` uniform doubles from [0, 1)
-    void generate_block(double *arr, size_t size) {
-        for (size_t i = 0; i < size; ++i) {
-            arr[i] = next();
+    //! Generate `size` uniform doubles from [0, 1) or approximately (0, 1] if
+    //! left_open is set
+    void generate_block(double *arr, size_t size, bool left_open = false) {
+        if (left_open) {
+            for (size_t i = 0; i < size; ++i) {
+                arr[i] = next_left_open();
+            }
+        } else {
+            for (size_t i = 0; i < size; ++i) {
+                arr[i] = next();
+            }
         }
     }
 
@@ -216,6 +250,7 @@ public:
 private:
     generator_t generator_;
     std::uniform_real_distribution<double> uniform_double_;
+    std::uniform_real_distribution<double> uniform_double_left_open_;
 };
 
 } // namespace generators
