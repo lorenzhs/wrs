@@ -5,8 +5,8 @@ echo "Usage: ./run_query_strong.sh [basename] [args for alias]"
 
 basename=$1
 
-filename=/global_data/lorenz/wrs/s${basename}results_$(date "+%F.%H-%M-%S").txt
-linkname=/global_data/lorenz/wrs/s${basename}results.txt
+filename=out/s${basename}results_$(date "+%F.%H-%M-%S").txt
+linkname=out/s${basename}results.txt
 
 echo "Invocation: $0 $*" | tee $filename
 echo "Running on $(hostname) on $(date)" | tee -a $filename

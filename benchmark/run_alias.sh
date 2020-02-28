@@ -7,8 +7,8 @@ echo "Invocation: $0 $*" | tee $filename
 echo "Running on $(hostname) on $(date)" | tee -a $filename
 
 logsize=$1
-filename=/global_data/lorenz/wrs/results_${logsize}_$(date "+%F.%H-%M-%S").txt
-linkname=/global_data/lorenz/wrs/results_${logsize}.txt
+filename=out/results_${logsize}_$(date "+%F.%H-%M-%S").txt
+linkname=out/results_${logsize}.txt
 
 size=$((10**logsize))
 
