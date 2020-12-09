@@ -7,13 +7,15 @@
  ******************************************************************************/
 
 #include <benchmark/util.hpp>
+
 #include <wrs/alias.hpp>
 #include <wrs/dedup.hpp>
 #include <wrs/generators/select.hpp>
 #include <wrs/multi_alias.hpp>
 #include <wrs/outsens.hpp>
-#include <wrs/parallel_do.hpp>
 #include <wrs/par_scan_alias.hpp>
+#include <wrs/par_scan_alias2.hpp>
+#include <wrs/parallel_do.hpp>
 #include <wrs/simple_scan_alias.hpp>
 #include <wrs/timer.hpp>
 #include <wrs/verify.hpp>
@@ -43,11 +45,9 @@ static constexpr bool numa = false;
 static constexpr bool debug = true;
 
 template <typename alias_table, typename input_generator>
-tlx::Aggregate<double> run_alias(
-    input_generator && input_gen, size_t input_size,
-    int iterations, int repetitions,
-    size_t seed, const std::string &name)
-{
+tlx::Aggregate<double> run_alias(input_generator &&input_gen, size_t input_size,
+                                 int iterations, int repetitions, size_t seed,
+                                 const std::string &name) {
     LOG << "";
     LOG << "Constructing alias table using " << name << " method";
 
@@ -56,13 +56,13 @@ tlx::Aggregate<double> run_alias(
 
     auto init = [&]() {
         weights = input_gen(seed, input_size);
-        if constexpr(alias_table::init_with_seed) {
+        if constexpr (alias_table::init_with_seed) {
             table.init(input_size, seed);
         } else {
             table.init(input_size);
         }
     };
-    auto runner = [&](bool no_warmup) {
+    auto runner = [&](bool no_warmup, int, int) {
         const bool debug = no_warmup;
         wrs::timer timer;
         table.construct(weights.get(), weights.get() + input_size);
@@ -70,6 +70,7 @@ tlx::Aggregate<double> run_alias(
         wrs::verify(weights.get(), weights.get() + input_size, table);
         auto timers = table.get_timers();
 
+        // clang-format off
         LOG << "RESULT type=construction"
             << " total=" << duration
             << " timers=" << timers
@@ -78,20 +79,30 @@ tlx::Aggregate<double> run_alias(
             << " threads=" << wrs::get_num_threads() // only relevant for parallel...
             << " numa=" << numa
             << " seed=" << seed;
+        // clang-format on
 
         timers.insert(timers.begin(), duration);
         return timers;
     };
-    auto logger = [&](int it, auto& stats) {
+    auto logger = [&](int it, auto &stats) {
         LOG << "It " << it << " construction: " << std::fixed
-        << std::setprecision(3) << stats[0] << " seed=" << seed;
+            << std::setprecision(3) << stats[0] << " seed=" << seed;
         ++seed;
     };
     auto stats = run_benchmark(runner, logger, init, iterations, repetitions,
                                /* warmup its */ 1, /* warmup reps */ 1);
-    LOG << "Construction: " << std::fixed << std::setprecision(3) << stats[0]
-        << " (" << iterations << " iterations x " << repetitions << " repetitions)";
-    if (stats.size() == 8) { // parallel scan
+    LOG << "Construction: " << std::fixed << std::setprecision(3) << stats[0] << " ("
+        << iterations << " iterations x " << repetitions << " repetitions)";
+    if (stats.size() == 9) { // psa2
+        LOG << "\tPreprocessing:  " << stats[1];
+        LOG << "\tGreedy fill:    " << stats[2];
+        LOG << "\tClassification: " << stats[3];
+        LOG << "\tClass. prefsum: " << stats[4];
+        LOG << "\tIndex comp:     " << stats[5];
+        LOG << "\tWeight prefsum: " << stats[6];
+        LOG << "\tSplitting:      " << stats[7];
+        LOG << "\tBase cases:     " << stats[8];
+    } else if (stats.size() == 8) { // parallel scan
         LOG << "\tPreprocessing:  " << stats[1];
         LOG << "\tClassification: " << stats[2];
         LOG << "\tClass. prefsum: " << stats[3];
@@ -113,11 +124,9 @@ tlx::Aggregate<double> run_alias(
 }
 
 template <typename alias_table, typename input_generator>
-tlx::Aggregate<double> run_queries(
-    input_generator && input_gen, size_t input_size,
-    int iterations, int repetitions,
-    size_t queries, size_t seed, const std::string &name)
-{
+tlx::Aggregate<double> run_queries(input_generator &&input_gen, size_t input_size,
+                                   int iterations, int repetitions, size_t queries,
+                                   size_t seed, const std::string &name) {
     LOG << "";
     LOG << "Querying alias table using " << name << " method";
 
@@ -130,7 +139,7 @@ tlx::Aggregate<double> run_queries(
         weights = input_gen(seed, input_size);
         double t_gen = timer.get_and_reset();
 
-        if constexpr(alias_table::init_with_seed) {
+        if constexpr (alias_table::init_with_seed) {
             table.init(input_size, seed);
         } else {
             table.init(input_size);
@@ -143,6 +152,7 @@ tlx::Aggregate<double> run_queries(
         wrs::verify(weights.get(), weights.get() + input_size, table);
         double t_verify = timer.get_and_reset();
 
+        // clang-format off
         LOG1 << "RESULT type=qcons"
              << " total=" << total_timer.get()
              << " gen=" << t_gen
@@ -154,14 +164,15 @@ tlx::Aggregate<double> run_queries(
              << " threads=" << wrs::get_num_threads()
              << " numa=" << numa
              << " seed=" << seed;
+        // clang-format on
     };
 
-    auto runner = [&](const bool debug) {
+    auto runner = [&](const bool debug, int, int) {
         wrs::timer timer;
 
         // Run queries in parallel
         size_t result_size = queries;
-        if constexpr(alias_table::yields_single_sample) {
+        if constexpr (alias_table::yields_single_sample) {
             wrs::parallel_do_block(
                 [&](size_t min, size_t max, auto) {
                     std::vector<typename alias_table::result_type> dummy(1);
@@ -175,7 +186,8 @@ tlx::Aggregate<double> run_queries(
                             dummy[0] = table.sample();
                         }
                     }
-                }, queries);
+                },
+                queries);
         } else {
             thread_local std::pair<typename alias_table::result_type, size_t> dummy;
             auto callback = [](auto sample, auto mult) {
@@ -187,6 +199,7 @@ tlx::Aggregate<double> run_queries(
         }
         double duration = timer.get();
 
+        // clang-format off
         LOG << "RESULT type=query"
             << " total=" << duration
             << " size=" << input_size
@@ -196,16 +209,17 @@ tlx::Aggregate<double> run_queries(
             << " threads=" << wrs::get_num_threads()
             << " numa=" << numa
             << " seed=" << seed;
+        // clang-format on
 
         return std::vector<double>{duration};
     };
-    auto logger = [&](int it, auto& stats) {
-        LOG << "It " << it << " queries: " << std::fixed
-        << std::setprecision(3) << stats[0] << " seed=" << seed;
+    auto logger = [&](int it, auto &stats) {
+        LOG << "It " << it << " queries: " << std::fixed << std::setprecision(3)
+            << stats[0] << " seed=" << seed;
         ++seed;
     };
     auto stats = run_benchmark(runner, logger, init, iterations, repetitions,
-        /* warmup its */ 0, /* warmup reps */ 1);
+                               /* warmup its */ 0, /* warmup reps */ 1);
     LOG << "Queries: " << std::fixed << std::setprecision(3) << stats[0];
     return stats[0];
 }
@@ -216,11 +230,10 @@ int main(int argc, char *argv[]) {
 
     size_t input_size = 100, queries = 1000, seed = 0, num_threads = 0;
     int iterations = 2, repetitions = 5;
-    bool normalize = false, no_seq = false, no_dedup = false,
-        no_multi = false, no_multisweep = false, no_simplescan = false,
-        no_psa = false,
-        no_outsens = false, no_outsensnd = false, no_gsl = false,
-        no_queries = false, no_construct = false;
+    bool normalize = false, no_seq = false, no_dedup = false, no_multi = false,
+         no_multisweep = false, no_simplescan = false, no_psa = false,
+         no_psa2 = false, no_outsens = false, no_outsensnd = false,
+         no_gsl = false, no_queries = false, no_construct = false;
     double powerlaw_exp = 0;
     clp.add_size_t('n', "input-size", input_size, "input size");
     clp.add_int('i', "iterations", iterations, "iterations");
@@ -231,15 +244,21 @@ int main(int argc, char *argv[]) {
     clp.add_double('p', "powerlaw", powerlaw_exp,
                    "powerlaw distribution exponent (instead of uniform)");
     clp.add_bool('Q', "noqueries", no_queries, "don't run query benchmark");
-    clp.add_bool('C', "noconstruct", no_construct, "don't run construction benchmark");
+    clp.add_bool('C', "noconstruct", no_construct,
+                 "don't run construction benchmark");
     clp.add_bool('S', "noseq", no_seq, "don't run sequential version");
-    clp.add_bool('D', "nodedup", no_dedup, "don't run deduplicating sequential version");
+    clp.add_bool('D', "nodedup", no_dedup,
+                 "don't run deduplicating sequential version");
     clp.add_bool('M', "nomulti", no_multi, "don't run multi+alias version");
-    clp.add_bool('L', "nomultisweep", no_multisweep, "don't run multi+sweep version");
-    clp.add_bool('E', "nosimplescan", no_simplescan, "don't run simple scanning version (sweep)");
+    clp.add_bool('L', "nomultisweep", no_multisweep,
+                 "don't run multi+sweep version");
+    clp.add_bool('E', "nosimplescan", no_simplescan,
+                 "don't run simple scanning version (sweep)");
     clp.add_bool('B', "nopsa", no_psa, "don't run parallel scanning version");
+    clp.add_bool('P', "nopsa2", no_psa2, "don't run fast parallel scanning version");
     clp.add_bool('O', "nooutsens", no_outsens, "don't run output sensitive version");
-    clp.add_bool('R', "nooutsensnd", no_outsensnd, "don't run non-deduplicating output-sensitive version");
+    clp.add_bool('R', "nooutsensnd", no_outsensnd,
+                 "don't run non-deduplicating output-sensitive version");
     clp.add_bool('G', "nogsl", no_gsl, "don't run GSL version");
     clp.add_size_t('t', "threads", num_threads, "number of threads");
 
@@ -271,9 +290,11 @@ int main(int argc, char *argv[]) {
                 } else {
                     wrs::generators::select_t generator(seed + min + 1);
                     // TODO size must be even
-                    generator.generate_block(data + min, max - min, /* left_open */ true);
+                    generator.generate_block(data + min, max - min,
+                                             /* left_open */ true);
                 }
-            }, input_size, static_cast<size_t>(0), 1UL << 18);
+            },
+            input_size, static_cast<size_t>(0), 1UL << 18);
         if (powerlaw_exp > 0) {
             // shuffle
             wrs::generators::select_t generator(seed);
@@ -284,15 +305,15 @@ int main(int argc, char *argv[]) {
         }
 
         LOG << "generated " << input_size << " input values in "
-        << timer.get_and_reset() << "ms";
+            << timer.get_and_reset() << "ms";
 
         // normalize
         if (normalize) {
-            double sum = std::accumulate(weights.get(),
-                                         weights.get() + input_size, 0.0);
+            double sum =
+                std::accumulate(weights.get(), weights.get() + input_size, 0.0);
             sum /= input_size;
-            wrs::parallel_do(
-                [&weights, &sum](size_t i) { weights[i] /= sum; }, input_size);
+            wrs::parallel_do([&weights, &sum](size_t i) { weights[i] /= sum; },
+                             input_size);
 
             LOG << "normalized input in " << timer.get_and_reset() << "ms";
         }
@@ -303,6 +324,7 @@ int main(int argc, char *argv[]) {
         return weights;
     };
 
+    // clang-format off
     if (!no_construct && !no_seq)
         run_alias<wrs::alias<>>(input_gen, input_size, iterations,
                                 repetitions, seed, "sequential");
@@ -317,7 +339,10 @@ int main(int argc, char *argv[]) {
                                             repetitions, seed, "simplescan");
     if (!no_construct && !no_psa)
         run_alias<wrs::par_scan_alias<>>(input_gen, input_size, iterations,
-                                          repetitions, seed, "psa");
+                                         repetitions, seed, "psa");
+    if (!no_construct && !no_psa2)
+        run_alias<wrs::par_scan_alias2<>>(input_gen, input_size, iterations,
+                                          repetitions, seed, "psa2");
     if (!no_construct && !no_outsens)
         run_alias<wrs::par_outsens<>>(input_gen, input_size, iterations,
                                       repetitions, seed, "outsens");
@@ -358,6 +383,9 @@ int main(int argc, char *argv[]) {
     if (!no_queries && !no_psa)
         run_queries<wrs::par_scan_alias<>>(
             input_gen, input_size, iterations, repetitions, queries, seed, "psa");
+    if (!no_queries && !no_psa2)
+        run_queries<wrs::par_scan_alias2<>>(
+            input_gen, input_size, iterations, repetitions, queries, seed, "psa2");
     if (!no_queries && !no_outsens)
         run_queries<wrs::par_outsens<>>(
             input_gen, input_size, iterations, repetitions, queries, seed, "outsens");
@@ -369,6 +397,7 @@ int main(int argc, char *argv[]) {
         run_queries<wrs::gsl_alias>(
             input_gen, input_size, iterations, repetitions, queries, seed, "gsl");
 #endif
+    // clang-format on
 
     wrs::release_threads();
     return 0;

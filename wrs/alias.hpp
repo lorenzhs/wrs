@@ -32,29 +32,29 @@ namespace wrs {
 
 template <typename size_type = uint32_t>
 struct alias {
-    static constexpr const char* name = "alias";
+    static constexpr const char *name = "alias";
     static constexpr bool yields_single_sample = true;
     static constexpr bool init_with_seed = false;
     static constexpr int pass_rand = 1;
     using result_type = size_type;
     using pair = std::pair<size_type, double>;
 
-    static_assert((sizeof(double) / sizeof(size_type)) * sizeof(size_type) == sizeof(double),
+    static_assert((sizeof(double) / sizeof(size_type)) * sizeof(size_type) ==
+                      sizeof(double),
                   "size_type has weird size");
     static constexpr size_t ti_ptroffset = sizeof(double) / sizeof(size_type);
 
     // Alias table member item, used to be a std::tuple<double, size_type, size_type>
     struct tableitem {
         double p; // probability
-        size_type i; // item
         size_type a; // alia
 
-        tableitem() : p(0), i(-1), a(-1) {}
-        tableitem(double p_, size_type i_, size_type a_) : p(p_), i(i_), a(a_) {}
+        tableitem() : p(0), a(-1) {}
+        tableitem(double p_, size_type a_) : p(p_), a(a_) {}
     };
 
-    friend std::ostream &operator << (std::ostream &os, const tableitem &item) {
-        return os << '(' << item.p << ',' << item.i << ',' << item.a << ')';
+    friend std::ostream &operator<<(std::ostream &os, const tableitem &item) {
+        return os << '(' << item.p << ',' << item.a << ')';
     }
 
     static constexpr bool debug = false;
@@ -68,7 +68,7 @@ struct alias {
         construct(w_begin, w_end);
     }
 
-    alias & operator = (const alias & other) {
+    alias &operator=(const alias &other) {
         LOG0 << "alias copy assignment/constructor called";
         size_ = other.size_;
         W_ = other.W_;
@@ -88,7 +88,7 @@ struct alias {
     //! delete move-constructor
     alias(alias &&) = delete;
     //! delete move-assignment
-    alias & operator = (alias &&) = delete;
+    alias &operator=(alias &&) = delete;
 
     void init(size_t size) {
         table_ = make_alloc_arr<tableitem>(size);
@@ -133,27 +133,25 @@ struct alias {
         LOGC(time) << "Step 1: classification took " << timers_.back() << "ms";
 
         // Assign items
-        auto s_begin = work_.get(), s_end = work_.get() + i_small,
-            l_begin = s_end, l_end = work_.get() + size_,
-            small = s_begin, large = l_begin;
+        auto s_begin = work_.get(), s_end = work_.get() + i_small, l_begin = s_end,
+             l_end = work_.get() + size_, small = s_begin, large = l_begin;
         LOG_ARR(work_.get(), "work");
         while (small != s_end && large != l_end) {
-            LOG << "table_[" << small->first << "] = (" << small->second
-                << ", " << small->first << ", " << large->first << ")";
-            table_[small->first] =
-                tableitem(small->second, small->first, large->first);
+            LOG << "table_[" << small->first << "] = (" << small->second << ", "
+                << small->first << ", " << large->first << ")";
+            table_[small->first] = tableitem(small->second, large->first);
             large->second = (large->second + small->second) - W_n_;
 
             if (is_small(large)) {
-                sLOG << "large item became small, remaining weight:"
-                     << *large << "moving to end of small items";
+                sLOG << "large item became small, remaining weight:" << *large
+                     << "moving to end of small items";
                 if (large > s_end) {
                     std::swap(large, s_end);
                 } else {
                     LOG << "no need to swap, is first";
                 }
                 s_end++;
-                //l_begin++; // not really needed, just for bookkeping
+                // l_begin++; // not really needed, just for bookkeping
                 large++;
             } else {
                 sLOG << "large item" << *large << "remained large, advancing small";
@@ -163,18 +161,20 @@ struct alias {
         while (large != l_end) {
             size_t i_large = large->first;
             LOG << "large item left at the end: " << *large;
-            LOG << "table_[" << i_large << "] = (" << W_n_ << ", " << i_large << ", -1)";
+            LOG << "table_[" << i_large << "] = (" << W_n_ << ", " << i_large
+                << ", -1)";
 
-            table_[i_large] = tableitem(W_n_, i_large, i_large);
+            table_[i_large] = tableitem(W_n_, i_large);
             large++;
         }
         while (small != s_end) {
             size_t i_small = small->first;
             sLOG << "encountered some numerical instability!"
                  << "Item" << i_small << "weight" << *small;
-            LOG << "table_[" << i_small << "] = (" << W_n_ << ", " << i_small << ", -1)";
+            LOG << "table_[" << i_small << "] = (" << W_n_ << ", " << i_small
+                << ", -1)";
 
-            table_[i_small] = tableitem(W_n_, i_small, i_small);
+            table_[i_small] = tableitem(W_n_, i_small);
             small++;
         }
         timers_.push_back(t.get_and_reset());
@@ -182,34 +182,37 @@ struct alias {
     }
 
     // Query given a uniformly distributed [0,1) random value
-    size_type sample(double uniform) const {
-        assert(size_ != static_cast<size_t>(-1));
-        double rand = uniform * size_;
-        size_t index = rand;
-        tableitem& item = table_[index];
+    size_type sample(double rand) const {
+        // scale up to table size
+        rand *= size_;
 
-        // sanity check: if alias == -1, then prob == 1
+        // Copy the item's index and its alias into temp_
+        size_type candidates[2];
+        candidates[0] = static_cast<size_type>(rand); // bucket ID (index)
+        candidates[1] = table_[candidates[0]].a; // fetch bucket alias
+
+        // reference to the item, for convenience
+        tableitem &item = table_[candidates[0]];
+        // sanity check: if the item doesn't have an alias, then it must fill
+        // the bucket on its own
         assert(item.a != static_cast<size_type>(-1) ||
-               std::abs(item.p - 1) < 1e-10);
+               std::abs(item.p - W_n_) < 1e-7);
 
-        rand = (rand - index) * W_n_;
-        size_t offset = rand >= item.p;
-        assert(item.a != static_cast<size_type>(-1) || offset == 0);
-        // ugly hack
-        return *(reinterpret_cast<size_type*>(&item) + ti_ptroffset + offset);
+        // scale remaining randomness to range of bucket weights
+        rand = (rand - candidates[0]) * W_n_;
+        return candidates[rand >= item.p];
     }
 
     // Sum up all weights in the table, adding `offset` to every item ID.
     // This is used internally by verify() and by multi_alias' verify()
     void verify_helper(std::vector<double> &weights, size_t offset) const {
-        wrs::sum_tritable<size_type>(
-            table_.get(), size_, W_, W_n_, weights, offset);
+        wrs::sum_table<size_type>(table_.get(), size_, W_, W_n_, weights, offset);
     }
 
     template <typename Iterator>
     void verify(Iterator begin, Iterator end) const {
-        (void) begin;
-        (void) end;
+        (void)begin;
+        (void)end;
 #ifndef NDEBUG
         assert(end - begin == static_cast<ssize_t>(size_));
         std::vector<double> weights(size_);
@@ -235,26 +238,26 @@ struct alias {
     }
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
+    void find(size_type item, Callback &&callback) const {
+        if (size_ == static_cast<size_t>(-1))
+            return;
+        if (item < size_)
+            callback(0, item, table_[item].p, table_[item]);
         for (size_t i = 0; i < size_; i++) {
-            if (table_[i].i == item) {
-                callback(0, i, table_[i].p, table_[i]);
-            } else if (table_[i].a == item) {
+            if (table_[i].a == item) {
                 callback(0, i, W_n_ - table_[i].p, table_[i]);
             }
         }
     }
 
 protected:
-
     TLX_ATTRIBUTE_ALWAYS_INLINE
-    bool is_small(const double& d) const {
+    bool is_small(const double &d) const {
         return d <= W_n_;
     }
 
     template <typename Iterator>
-    TLX_ATTRIBUTE_ALWAYS_INLINE
-    bool is_small(Iterator it) const {
+    TLX_ATTRIBUTE_ALWAYS_INLINE bool is_small(Iterator it) const {
         return it->second <= W_n_;
     }
 

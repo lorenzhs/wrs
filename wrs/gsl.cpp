@@ -4,7 +4,9 @@
  * Inlined gsl_ran_discrete_preproc in order to measure allocations separately
  *
  *******************************************************************************
- * Copyright (C) 1996, 1997, 1998, 1999, 2000, 2007, 2009 James Theiler, Brian Gough
+ * Copyright (C) 1996, 1997, 1998, 1999, 2000, 2007, 2009 James Theiler, Brian
+ * Gough
+ *
  * Copyright (C) 2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -27,12 +29,13 @@
 #ifdef WRS_HAVE_GSL
 
 //#include <config.h>
-#include <stdio.h>              /* used for NULL, also fprintf(stderr,...) */
-#include <stdlib.h>             /* used for malloc's */
-#include <math.h>
 #include <gsl/gsl_errno.h>
-#include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
+#include <gsl/gsl_rng.h>
+
+#include <math.h>
+#include <stdio.h> /* used for NULL, also fprintf(stderr,...) */
+#include <stdlib.h> /* used for malloc's */
 
 namespace wrs {
 namespace gsl {
@@ -182,9 +185,8 @@ extern "C" {
  */
 
 #define DEBUG 0
-#define KNUTH_CONVENTION 1      /* Saves a few steps of arithmetic
-                                 * in the call to gsl_ran_discrete()
-                                 */
+/* Saves a few steps of arithmetic in the call to gsl_ran_discrete() */
+#define KNUTH_CONVENTION 1
 
 /*** Begin Stack (this code is used just in this file) ***/
 
@@ -192,28 +194,24 @@ extern "C" {
    means an empty stack, instead of -1), for consistency and to give a
    bigger allowable range. BJG */
 
-static int
-push_stack(gsl_stack_t *s, size_t v)
-{
+static int push_stack(gsl_stack_t *s, size_t v) {
     if ((s->i) >= (s->N)) {
-      return -1; /* stack overflow (shouldn't happen) */
+        return -1; /* stack overflow (shouldn't happen) */
     }
     (s->v)[s->i] = v;
     s->i += 1;
     return 0;
 }
 
-static size_t pop_stack(gsl_stack_t *s)
-{
+static size_t pop_stack(gsl_stack_t *s) {
     if ((s->i) == 0) {
-      GSL_ERROR ("internal error - stack exhausted", GSL_ESANITY);
+        GSL_ERROR("internal error - stack exhausted", GSL_ESANITY);
     }
     s->i -= 1;
     return ((s->v)[s->i]);
 }
 
-static inline size_t size_stack(const gsl_stack_t *s)
-{
+static inline size_t size_stack(const gsl_stack_t *s) {
     return s->i;
 }
 
@@ -221,88 +219,81 @@ static inline size_t size_stack(const gsl_stack_t *s)
 
 /*** Begin Walker's Algorithm ***/
 
-double
-my_gsl_ran_discrete_preproc(size_t Kevents, const double *ProbArray,
-                            gsl_ran_discrete_t *g, double *E,
-                            gsl_stack_t *Bigs, gsl_stack_t *Smalls)
-{
-    size_t k,b,s;
+double my_gsl_ran_discrete_preproc(size_t Kevents, const double *ProbArray,
+                                   gsl_ran_discrete_t *g, double *E,
+                                   gsl_stack_t *Bigs, gsl_stack_t *Smalls) {
+    size_t k, b, s;
     // size_t nBigs, nSmalls;
     double pTotal = 0.0, mean, d;
 
     if (Kevents < 1) {
-      /* Could probably treat Kevents=1 as a special case */
+        /* Could probably treat Kevents=1 as a special case */
 
-      GSL_ERROR_VAL ("number of events must be a positive integer",
-                        GSL_EINVAL, 0);
+        GSL_ERROR_VAL("number of events must be a positive integer", GSL_EINVAL, 0);
     }
 
     /* Make sure elements of ProbArray[] are positive.
      * Won't enforce that sum is unity; instead will just normalize
      */
 
-    for (k=0; k<Kevents; ++k) {
+    for (k = 0; k < Kevents; ++k) {
         if (ProbArray[k] < 0) {
-          GSL_ERROR_VAL ("probabilities must be non-negative",
-                            GSL_EINVAL, 0) ;
+            GSL_ERROR_VAL("probabilities must be non-negative", GSL_EINVAL, 0);
         }
         pTotal += ProbArray[k];
     }
 
-    for (k=0; k<Kevents; ++k) {
-        E[k] = ProbArray[k]/pTotal;
+    for (k = 0; k < Kevents; ++k) {
+        E[k] = ProbArray[k] / pTotal;
     }
 
     /* Now create the Bigs and the Smalls */
-    mean = 1.0/Kevents;
+    mean = 1.0 / Kevents;
     {
-      for (k=0; k<Kevents; ++k) {
-        gsl_stack_t * Dest = (E[k] >= mean) ? Bigs : Smalls;
-        int status = push_stack(Dest,k);
-        if (status)
-          GSL_ERROR_VAL ("failed to build stacks", GSL_EFAILED, 0);
-      }
+        for (k = 0; k < Kevents; ++k) {
+            gsl_stack_t *Dest = (E[k] >= mean) ? Bigs : Smalls;
+            int status = push_stack(Dest, k);
+            if (status)
+                GSL_ERROR_VAL("failed to build stacks", GSL_EFAILED, 0);
+        }
     }
 
     /* Now work through the smalls */
     while (size_stack(Smalls) > 0) {
         s = pop_stack(Smalls);
         if (size_stack(Bigs) == 0) {
-            (g->A)[s]=s;
-            (g->F)[s]=1.0;
+            (g->A)[s] = s;
+            (g->F)[s] = 1.0;
             continue;
         }
         b = pop_stack(Bigs);
-        (g->A)[s]=b;
-        (g->F)[s]=Kevents*E[s];
+        (g->A)[s] = b;
+        (g->F)[s] = Kevents * E[s];
 #if DEBUG
-        fprintf(stderr,"s=%2d, A=%2d, F=%.4f\n",s,(g->A)[s],(g->F)[s]);
+        fprintf(stderr, "s=%2d, A=%2d, F=%.4f\n", s, (g->A)[s], (g->F)[s]);
 #endif
         d = mean - E[s];
-        E[s] += d;              /* now E[s] == mean */
+        E[s] += d; /* now E[s] == mean */
         E[b] -= d;
         if (E[b] < mean) {
-            push_stack(Smalls,b); /* no longer big, join ranks of the small */
-        }
-        else if (E[b] > mean) {
-            push_stack(Bigs,b); /* still big, put it back where you found it */
-        }
-        else {
+            push_stack(Smalls, b); /* no longer big, join ranks of the small */
+        } else if (E[b] > mean) {
+            push_stack(Bigs, b); /* still big, put it back where you found it */
+        } else {
             /* E[b]==mean implies it is finished too */
-            (g->A)[b]=b;
-            (g->F)[b]=1.0;
+            (g->A)[b] = b;
+            (g->F)[b] = 1.0;
         }
     }
     while (size_stack(Bigs) > 0) {
         b = pop_stack(Bigs);
-        (g->A)[b]=b;
-        (g->F)[b]=1.0;
+        (g->A)[b] = b;
+        (g->F)[b] = 1.0;
     }
     /* Stacks have been emptied, and A and F have been filled */
 
-    if ( size_stack(Smalls) != 0) {
-      GSL_ERROR_VAL ("Smalls stack has not been emptied",
-                     GSL_ESANITY, 0 );
+    if (size_stack(Smalls) != 0) {
+        GSL_ERROR_VAL("Smalls stack has not been emptied", GSL_ESANITY, 0);
     }
 
 #if KNUTH_CONVENTION
@@ -310,7 +301,7 @@ my_gsl_ran_discrete_preproc(size_t Kevents, const double *ProbArray,
     /* This saves some arithmetic in gsl_ran_discrete(); I find that
      * it doesn't actually make much difference.
      */
-    for (k=0; k<Kevents; ++k) {
+    for (k = 0; k < Kevents; ++k) {
         (g->F)[k] += k;
         (g->F)[k] /= Kevents;
     }

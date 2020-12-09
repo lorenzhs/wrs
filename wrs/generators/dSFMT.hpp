@@ -54,8 +54,8 @@
 #ifndef WRS_GENERATORS_DSFMT_HEADER
 #define WRS_GENERATORS_DSFMT_HEADER
 
-#include <tlx/logger.hpp>
 #include <tlx/define.hpp>
+#include <tlx/logger.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -71,9 +71,9 @@
 
 #include <inttypes.h>
 #if defined(HAVE_ALTIVEC) && !defined(__APPLE__)
-#  include <altivec.h>
+#include <altivec.h>
 #elif defined(WRS_HAVE_SSE2)
-#  include <emmintrin.h>
+#include <emmintrin.h>
 #endif
 
 namespace wrs {
@@ -99,68 +99,68 @@ extern "C" {
 #define DSFMT_N64 (DSFMT_N * 2)
 
 #if !defined(DSFMT_BIG_ENDIAN)
-#  if defined(__BYTE_ORDER) && defined(__BIG_ENDIAN)
-#    if __BYTE_ORDER == __BIG_ENDIAN
-#      define DSFMT_BIG_ENDIAN 1
-#    endif
-#  elif defined(_BYTE_ORDER) && defined(_BIG_ENDIAN)
-#    if _BYTE_ORDER == _BIG_ENDIAN
-#      define DSFMT_BIG_ENDIAN 1
-#    endif
-#  elif defined(__BYTE_ORDER__) && defined(__BIG_ENDIAN__)
-#    if __BYTE_ORDER__ == __BIG_ENDIAN__
-#      define DSFMT_BIG_ENDIAN 1
-#    endif
-#  elif defined(BYTE_ORDER) && defined(BIG_ENDIAN)
-#    if BYTE_ORDER == BIG_ENDIAN
-#      define DSFMT_BIG_ENDIAN 1
-#    endif
-#  elif defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN) \
-    || defined(__BIG_ENDIAN__) || defined(BIG_ENDIAN)
-#      define DSFMT_BIG_ENDIAN 1
-#  endif
+#if defined(__BYTE_ORDER) && defined(__BIG_ENDIAN)
+#if __BYTE_ORDER == __BIG_ENDIAN
+#define DSFMT_BIG_ENDIAN 1
+#endif
+#elif defined(_BYTE_ORDER) && defined(_BIG_ENDIAN)
+#if _BYTE_ORDER == _BIG_ENDIAN
+#define DSFMT_BIG_ENDIAN 1
+#endif
+#elif defined(__BYTE_ORDER__) && defined(__BIG_ENDIAN__)
+#if __BYTE_ORDER__ == __BIG_ENDIAN__
+#define DSFMT_BIG_ENDIAN 1
+#endif
+#elif defined(BYTE_ORDER) && defined(BIG_ENDIAN)
+#if BYTE_ORDER == BIG_ENDIAN
+#define DSFMT_BIG_ENDIAN 1
+#endif
+#elif defined(__BIG_ENDIAN) || defined(_BIG_ENDIAN) ||                         \
+    defined(__BIG_ENDIAN__) || defined(BIG_ENDIAN)
+#define DSFMT_BIG_ENDIAN 1
+#endif
 #endif
 
 #if defined(DSFMT_BIG_ENDIAN) && defined(__amd64)
-#  undef DSFMT_BIG_ENDIAN
+#undef DSFMT_BIG_ENDIAN
 #endif
 
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L)
 //#  include <inttypes.h>
 #elif defined(_MSC_VER) || defined(__BORLANDC__)
-#  if !defined(DSFMT_UINT32_DEFINED) && !defined(SFMT_UINT32_DEFINED)
+#if !defined(DSFMT_UINT32_DEFINED) && !defined(SFMT_UINT32_DEFINED)
 typedef unsigned int uint32_t;
 typedef unsigned __int64 uint64_t;
-#    ifndef UINT64_C
-#      define UINT64_C(v) (v ## ui64)
-#    endif
-#    define DSFMT_UINT32_DEFINED
-#    if !defined(inline) && !defined(__cplusplus)
-#      define inline __inline
-#    endif
-#  endif
+#ifndef UINT64_C
+#define UINT64_C(v) (v##ui64)
+#endif
+#define DSFMT_UINT32_DEFINED
+#if !defined(inline) && !defined(__cplusplus)
+#define inline __inline
+#endif
+#endif
 #else
 //#  include <inttypes.h>
-#  if !defined(inline) && !defined(__cplusplus)
-#    if defined(__GNUC__)
-#      define inline __inline__
-#    else
-#      define inline
-#    endif
-#  endif
+#if !defined(inline) && !defined(__cplusplus)
+#if defined(__GNUC__)
+#define inline __inline__
+#else
+#define inline
+#endif
+#endif
 #endif
 
 #ifndef UINT64_C
-#  define UINT64_C(v) (v ## ULL)
+#define UINT64_C(v) (v##ULL)
 #endif
 
 /*------------------------------------------
   128-bit SIMD like data type for standard C
   ------------------------------------------*/
 #if defined(HAVE_ALTIVEC)
-#  if !defined(__APPLE__)
+#if !defined(__APPLE__)
 //#    include <altivec.h>
-#  endif
+#endif
 /** 128-bit data structure */
 union W128_T {
     vector unsigned int s;
@@ -180,7 +180,7 @@ union W128_T {
     uint32_t u32[4];
     double d[2];
 };
-#else  /* standard C */
+#else /* standard C */
 /** 128-bit data structure */
 union W128_T {
     uint64_t u[2];
@@ -217,28 +217,33 @@ inline static void dsfmt_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed) {
 /*
  * inlined: dSFMT-params.h
  */
-#define DSFMT_LOW_MASK  UINT64_C(0x000FFFFFFFFFFFFF)
+#define DSFMT_LOW_MASK   UINT64_C(0x000FFFFFFFFFFFFF)
 #define DSFMT_HIGH_CONST UINT64_C(0x3FF0000000000000)
-#define DSFMT_SR	12
+#define DSFMT_SR         12
 
 /* for sse2 */
 #if defined(WRS_HAVE_SSE2)
-  #define SSE2_SHUFF 0x1b
+#define SSE2_SHUFF 0x1b
 #elif defined(HAVE_ALTIVEC)
-  #if defined(__APPLE__)  /* For OSX */
-    #define ALTI_SR (vector unsigned char)(4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4)
-    #define ALTI_SR_PERM \
-        (vector unsigned char)(15,0,1,2,3,4,5,6,15,8,9,10,11,12,13,14)
-    #define ALTI_SR_MSK \
-        (vector unsigned int)(0x000fffffU,0xffffffffU,0x000fffffU,0xffffffffU)
-    #define ALTI_PERM \
-        (vector unsigned char)(12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3)
-  #else
-    #define ALTI_SR      {4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4}
-    #define ALTI_SR_PERM {15,0,1,2,3,4,5,6,15,8,9,10,11,12,13,14}
-    #define ALTI_SR_MSK  {0x000fffffU,0xffffffffU,0x000fffffU,0xffffffffU}
-    #define ALTI_PERM    {12,13,14,15,8,9,10,11,4,5,6,7,0,1,2,3}
-  #endif
+#if defined(__APPLE__) /* For OSX */
+#define ALTI_SR                                                                \
+    (vector unsigned char)(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4)
+#define ALTI_SR_PERM                                                           \
+    (vector unsigned char)(15, 0, 1, 2, 3, 4, 5, 6, 15, 8, 9, 10, 11, 12, 13, 14)
+#define ALTI_SR_MSK                                                            \
+    (vector unsigned int)(0x000fffffU, 0xffffffffU, 0x000fffffU, 0xffffffffU)
+#define ALTI_PERM                                                              \
+    (vector unsigned char)(12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3)
+#else
+#define ALTI_SR                                                                \
+    { 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 }
+#define ALTI_SR_PERM                                                           \
+    { 15, 0, 1, 2, 3, 4, 5, 6, 15, 8, 9, 10, 11, 12, 13, 14 }
+#define ALTI_SR_MSK                                                            \
+    { 0x000fffffU, 0xffffffffU, 0x000fffffU, 0xffffffffU }
+#define ALTI_PERM                                                              \
+    { 12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3 }
+#endif
 #endif
 
 /*
@@ -247,37 +252,39 @@ inline static void dsfmt_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed) {
 
 /* #define DSFMT_N	191 */
 /* #define DSFMT_MAXDEGREE	19992 */
-#define DSFMT_POS1	117
-#define DSFMT_SL1	19
-#define DSFMT_MSK1	UINT64_C(0x000ffafffffffb3f)
-#define DSFMT_MSK2	UINT64_C(0x000ffdfffc90fffd)
-#define DSFMT_MSK32_1	0x000ffaffU
-#define DSFMT_MSK32_2	0xfffffb3fU
-#define DSFMT_MSK32_3	0x000ffdffU
-#define DSFMT_MSK32_4	0xfc90fffdU
-#define DSFMT_FIX1	UINT64_C(0x90014964b32f4329)
-#define DSFMT_FIX2	UINT64_C(0x3b8d12ac548a7c7a)
-#define DSFMT_PCV1	UINT64_C(0x3d84e1ac0dc82880)
-#define DSFMT_PCV2	UINT64_C(0x0000000000000001)
+#define DSFMT_POS1    117
+#define DSFMT_SL1     19
+#define DSFMT_MSK1    UINT64_C(0x000ffafffffffb3f)
+#define DSFMT_MSK2    UINT64_C(0x000ffdfffc90fffd)
+#define DSFMT_MSK32_1 0x000ffaffU
+#define DSFMT_MSK32_2 0xfffffb3fU
+#define DSFMT_MSK32_3 0x000ffdffU
+#define DSFMT_MSK32_4 0xfc90fffdU
+#define DSFMT_FIX1    UINT64_C(0x90014964b32f4329)
+#define DSFMT_FIX2    UINT64_C(0x3b8d12ac548a7c7a)
+#define DSFMT_PCV1    UINT64_C(0x3d84e1ac0dc82880)
+#define DSFMT_PCV2    UINT64_C(0x0000000000000001)
 
 
 /* PARAMETERS FOR ALTIVEC */
-#if defined(__APPLE__)	/* For OSX */
-    #define ALTI_SL1 	(vector unsigned char)(3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3)
-    #define ALTI_SL1_PERM \
-	(vector unsigned char)(2,3,4,5,6,7,30,30,10,11,12,13,14,15,0,1)
-    #define ALTI_SL1_MSK \
-	(vector unsigned int)(0xffffffffU,0xfff80000U,0xffffffffU,0xfff80000U)
-    #define ALTI_MSK	(vector unsigned int)(DSFMT_MSK32_1, \
-			DSFMT_MSK32_2, DSFMT_MSK32_3, DSFMT_MSK32_4)
-#else	/* For OTHER OSs(Linux?) */
-    #define ALTI_SL1 	{3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3}
-    #define ALTI_SL1_PERM \
-	{2,3,4,5,6,7,30,30,10,11,12,13,14,15,0,1}
-    #define ALTI_SL1_MSK \
-	{0xffffffffU,0xfff80000U,0xffffffffU,0xfff80000U}
-    #define ALTI_MSK \
-	{DSFMT_MSK32_1, DSFMT_MSK32_2, DSFMT_MSK32_3, DSFMT_MSK32_4}
+#if defined(__APPLE__) /* For OSX */
+#define ALTI_SL1                                                               \
+    (vector unsigned char)(3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3)
+#define ALTI_SL1_PERM                                                          \
+    (vector unsigned char)(2, 3, 4, 5, 6, 7, 30, 30, 10, 11, 12, 13, 14, 15, 0, 1)
+#define ALTI_SL1_MSK                                                           \
+    (vector unsigned int)(0xffffffffU, 0xfff80000U, 0xffffffffU, 0xfff80000U)
+#define ALTI_MSK                                                               \
+    (vector unsigned int)(DSFMT_MSK32_1, DSFMT_MSK32_2, DSFMT_MSK32_3, DSFMT_MSK32_4)
+#else /* For OTHER OSs(Linux?) */
+#define ALTI_SL1                                                               \
+    { 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3 }
+#define ALTI_SL1_PERM                                                          \
+    { 2, 3, 4, 5, 6, 7, 30, 30, 10, 11, 12, 13, 14, 15, 0, 1 }
+#define ALTI_SL1_MSK                                                           \
+    { 0xffffffffU, 0xfff80000U, 0xffffffffU, 0xfff80000U }
+#define ALTI_MSK                                                               \
+    { DSFMT_MSK32_1, DSFMT_MSK32_2, DSFMT_MSK32_3, DSFMT_MSK32_4 }
 #endif
 
 /*
@@ -288,7 +295,7 @@ inline static void dsfmt_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed) {
 //#  include <emmintrin.h>
 union X128I_T {
     uint64_t u[2];
-    __m128i  i128;
+    __m128i i128;
 };
 union X128D_T {
     double d[2];
@@ -299,8 +306,7 @@ static const union X128I_T sse2_param_mask = {{DSFMT_MSK1, DSFMT_MSK2}};
 #endif
 
 #if defined(HAVE_ALTIVEC)
-inline static void do_recursion(w128_t *r, w128_t *a, w128_t * b,
-				w128_t *lung) {
+inline static void do_recursion(w128_t *r, w128_t *a, w128_t *b, w128_t *lung) {
     const vector unsigned char sl1 = ALTI_SL1;
     const vector unsigned char sl1_perm = ALTI_SL1_PERM;
     const vector unsigned int sl1_msk = ALTI_SL1_MSK;
@@ -359,8 +365,7 @@ inline static void do_recursion(w128_t *r, w128_t *a, w128_t *b, w128_t *u) {
  * @param b a 128-bit part of the internal state array
  * @param lung a 128-bit part of the internal state array (I/O)
  */
-inline static void do_recursion(w128_t *r, w128_t *a, w128_t * b,
-				w128_t *lung) {
+inline static void do_recursion(w128_t *r, w128_t *a, w128_t *b, w128_t *lung) {
     uint64_t t0, t1, L0, L1;
 
     t0 = a->u[0];
@@ -385,7 +390,7 @@ inline static void do_recursion(w128_t *r, w128_t *a, w128_t * b,
 class dSFMT {
 public:
     static constexpr bool debug = true;
-    static const char* name;
+    static const char *name;
 
     explicit dSFMT(size_t seed) : index_(0), block_size_(0), block_id_(0) {
         _dSFMT::dsfmt_init_gen_rand(&dsfmt_, seed);
@@ -394,11 +399,11 @@ public:
     //! non-copyable: delete copy-constructor
     dSFMT(const dSFMT &) = delete;
     //! non-copyable: delete assignment operator
-    dSFMT & operator = (const dSFMT &) = delete;
+    dSFMT &operator=(const dSFMT &) = delete;
     //! move-constructor: default
     dSFMT(dSFMT &&) = default;
     //! move-assignment operator: default
-    dSFMT & operator = (dSFMT &&) = default;
+    dSFMT &operator=(dSFMT &&) = default;
 
     //! Re-seed the dsfmt
     void seed(size_t seed) {
@@ -422,8 +427,7 @@ public:
 
     //! Generate `size` [0,1) doubles in `output` or (0, 1] if left_open is set
     void generate_block(std::vector<double> &output, size_t size,
-                        bool left_open = false)
-    {
+                        bool left_open = false) {
         // Ensure minimum block size (normally 382)
         const size_t min_size = _dSFMT::dsfmt_get_min_array_size();
         if (size < min_size) {
@@ -472,8 +476,7 @@ public:
                 // random numbers, increase the blocksize to reduce RNG overhead
                 block_size_ *= 2;
             }
-            block_size_ = std::max(block_size_,
-                                   minimum_reasonable_block_size());
+            block_size_ = std::max(block_size_, minimum_reasonable_block_size());
             // generate_block takes care of resizing the vector for us
             generate_block(randblock_, block_size_);
             index_ = 0;
@@ -489,8 +492,7 @@ public:
 
     //! Generate a uniform integer from [min, max] (i.e., both inclusive)
     template <typename int_t>
-    TLX_ATTRIBUTE_ALWAYS_INLINE
-    int_t next_int(int_t min, int_t max) {
+    TLX_ATTRIBUTE_ALWAYS_INLINE int_t next_int(int_t min, int_t max) {
         return next() * (max - min + 1) + min;
     }
 
@@ -513,7 +515,7 @@ public:
     TLX_ATTRIBUTE_ALWAYS_INLINE
     double next_gaussian(double mean, double stdev) {
         double U = next(), V = next();
-        double a = stdev * std::sqrt(-2*std::log(U));
+        double a = stdev * std::sqrt(-2 * std::log(U));
         double b = 2 * M_PI * V;
 
         return mean + a * std::cos(b);
@@ -523,7 +525,7 @@ public:
     TLX_ATTRIBUTE_ALWAYS_INLINE
     std::pair<double, double> next_two_gaussians(double mean, double stdev) {
         double U = next(), V = next();
-        double a = stdev * std::sqrt(-2*std::log(U));
+        double a = stdev * std::sqrt(-2 * std::log(U));
         double b = 2 * M_PI * V;
 
         U = mean + a * std::cos(b);
@@ -533,8 +535,7 @@ public:
 
     //! Generate `size` uniform integers from [min, max] (i.e., both inclusive)
     template <typename int_t>
-    void generate_int_block(int_t min, int_t max, int_t *arr, size_t size)
-    {
+    void generate_int_block(int_t min, int_t max, int_t *arr, size_t size) {
         for (size_t i = 0; i < size; ++i) {
             arr[i] = next_int(min, max);
         }
@@ -543,8 +544,7 @@ public:
     //! Generate `size` uniform integers from [min, max] (i.e., both inclusive)
     template <typename int_t>
     void generate_int_block(int_t min, int_t max, std::vector<int_t> &output,
-                            size_t size)
-    {
+                            size_t size) {
         if (size > output.size()) {
             output.resize(size);
         }
@@ -553,9 +553,7 @@ public:
 
     //! Generate `size` geometrically integers with parameter p
     template <typename int_t>
-    void generate_geometric_block(double p, int_t* arr,
-                                  size_t size)
-    {
+    void generate_geometric_block(double p, int_t *arr, size_t size) {
         const double denominator = std::log(1.0 - p);
         for (size_t i = 0; i < size; ++i) {
             arr[i] = std::log(next()) / denominator;
@@ -564,9 +562,7 @@ public:
 
     //! Generate `size` geometrically integers with parameter p
     template <typename int_t>
-    void generate_geometric_block(double p, std::vector<int_t> &output,
-                                  size_t size)
-    {
+    void generate_geometric_block(double p, std::vector<int_t> &output, size_t size) {
         if (size > output.size()) {
             output.resize(size);
         }
@@ -601,18 +597,19 @@ public:
         // this method generates two at a time, handle the last element
         // differently if size is odd
         const bool odd = (size % 2 == 1);
-        if (odd) --size;
+        if (odd)
+            --size;
 
         // first generate uniform values
         generate_block(arr, size);
 
         for (size_t i = 0; i < size; i += 2) {
-            double U = arr[i], V = arr[i+1];
-            double a = stdev * std::sqrt(-2*std::log(U));
+            double U = arr[i], V = arr[i + 1];
+            double a = stdev * std::sqrt(-2 * std::log(U));
             double b = 2 * M_PI * V;
 
-            arr[i]   = mean + a * std::cos(b);
-            arr[i+1] = mean + a * std::sin(b);
+            arr[i] = mean + a * std::cos(b);
+            arr[i + 1] = mean + a * std::sin(b);
         }
 
         if (odd) {
@@ -626,7 +623,8 @@ public:
     void generate_gaussian_block(double mean, double stdev,
                                  std::vector<double> &output, size_t size) {
         // only even sizes are supported
-        if (size % 2 == 1) ++size;
+        if (size % 2 == 1)
+            ++size;
 
         if (size > output.size()) {
             output.resize(size);

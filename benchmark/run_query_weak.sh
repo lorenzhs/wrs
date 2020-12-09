@@ -5,8 +5,8 @@ echo "Usage: ./run_query_weak.sh [basename] [args for alias]"
 
 basename=$1
 
-filename=out/w${basename}results_$(date "+%F.%H-%M-%S").txt
-linkname=out/w${basename}results.txt
+filename=/global_data/lorenz/wrs/w${basename}results_$(date "+%F.%H-%M-%S").txt
+linkname=/global_data/lorenz/wrs/w${basename}results.txt
 
 echo "Invocation: $0 $*" | tee $filename
 echo "Running on $(hostname) on $(date)" | tee -a $filename

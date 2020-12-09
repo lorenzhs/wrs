@@ -20,29 +20,34 @@ int g_num_numa_nodes;
 int g_total_threads;
 std::vector<tlx::ThreadPool*> global_pools;
 
-void init_threads(int threads) {
+void init_threads(int threads, bool numa) {
     g_total_threads = threads;
 #ifdef WRS_HAVE_NUMA
-    // pin main thread to numa node 0
-    numa_run_on_node(0);
+    if (numa) {
+        // pin main thread to numa node 0
+        numa_run_on_node(0);
 
-    g_num_numa_nodes = topoGetSystemNUMANodeCount();
-    // if we're using less threads than we have numa nodes, cap number of nodes
-    g_num_numa_nodes = std::min(g_total_threads, g_num_numa_nodes);
-    int threads_per_node = (threads + g_num_numa_nodes - 1) / g_num_numa_nodes;
+        g_num_numa_nodes = topoGetSystemNUMANodeCount();
+        // if we're using less threads than we have numa nodes, cap number of nodes
+        g_num_numa_nodes = std::min(g_total_threads, g_num_numa_nodes);
+        int threads_per_node = (threads + g_num_numa_nodes - 1) / g_num_numa_nodes;
 
-    int min = 0, max = threads_per_node;
-    for (int i = 0; i < g_num_numa_nodes; i++) {
-        int num_threads = max - min;
-        sLOG1 << "Pool" << i << "has" << num_threads << "threads";
-        global_pools.push_back(new tlx::ThreadPool(
-                                   num_threads, [i]{ numa_run_on_node(i); }));
-        min = max;
-        max = std::min(threads, max + threads_per_node);
+        int min = 0, max = threads_per_node;
+        for (int i = 0; i < g_num_numa_nodes; i++) {
+            int num_threads = max - min;
+            sLOG1 << "Pool" << i << "has" << num_threads << "threads";
+            global_pools.push_back(
+                new tlx::ThreadPool(num_threads, [i] { numa_run_on_node(i); }));
+            min = max;
+            max = std::min(threads, max + threads_per_node);
+        }
+    } else {
+#endif
+        (void)numa; // suppress unused variable warnung
+        g_num_numa_nodes = 1;
+        global_pools.push_back(new tlx::ThreadPool(threads));
+#ifdef WRS_HAVE_NUMA
     }
-#else
-    g_num_numa_nodes = 1;
-    global_pools.push_back(new tlx::ThreadPool(threads));
 #endif
 }
 

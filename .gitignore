@@ -1,3 +1,4 @@
+.clangd
 build*/
 # Created by https://www.gitignore.io/api/c++,cmake,emacs,vim
 # Edit at https://www.gitignore.io/?templates=c++,cmake,emacs,vim

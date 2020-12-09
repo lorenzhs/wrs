@@ -27,35 +27,34 @@ namespace generators {
 template <typename Generator = std::mt19937_64>
 class stl {
 public:
-    static constexpr const char* name = "stl";
+    static constexpr const char *name = "stl";
 
     using generator_t = Generator;
 
     //! Initialize new stl random generator
     explicit stl(size_t seed)
-        : generator_(seed == 0 ? std::random_device{}() : seed)
-        , uniform_double_left_open_(std::numeric_limits<double>::min(),
-                                    std::nextafter<double>(1.0, 2.0))
-    {}
+        : generator_(seed == 0 ? std::random_device{}() : seed),
+          uniform_double_left_open_(std::numeric_limits<double>::min(),
+                                    std::nextafter<double>(1.0, 2.0)) {}
 
-    stl(const stl & other)
-        : generator_(other.generator_)
-        , uniform_double_left_open_(std::numeric_limits<double>::min(),
-                                    std::nextafter<double>(1.0, 2.0))
-    {}
+    stl(const stl &other)
+        : generator_(other.generator_),
+          uniform_double_left_open_(std::numeric_limits<double>::min(),
+                                    std::nextafter<double>(1.0, 2.0)) {}
 
-    stl & operator = (const stl &other) {
+    stl &operator=(const stl &other) {
         generator_ = other.generator_;
         return *this;
     }
     //! move-constructor: default
     stl(stl &&) = default;
     //! move-assignment operator: default
-    stl & operator = (stl &&) = default;
+    stl &operator=(stl &&) = default;
 
     //! Re-seed the random generator
     void seed(size_t seed) {
-        if (seed == 0) seed = std::random_device{}();
+        if (seed == 0)
+            seed = std::random_device{}();
         generator_.seed(seed);
     }
 
@@ -162,8 +161,7 @@ public:
 
     //! Generate `size` uniform integers from [min, max] (i.e., both inclusive)
     template <typename int_t>
-    void generate_int_block(int_t min, int_t max, int_t *arr, size_t size)
-    {
+    void generate_int_block(int_t min, int_t max, int_t *arr, size_t size) {
         std::uniform_int_distribution<int_t> dist(min, max);
         for (size_t i = 0; i < size; ++i) {
             arr[i] = dist(generator_);
@@ -173,8 +171,7 @@ public:
     //! Generate `size` uniform integers from [min, max] (i.e., both inclusive)
     template <typename int_t>
     void generate_int_block(int_t min, int_t max, std::vector<int_t> &output,
-                            size_t size)
-    {
+                            size_t size) {
         if (size > output.size()) {
             output.resize(size);
         }
@@ -183,8 +180,7 @@ public:
 
     //! Generate `size` geometrically integers with parameter p
     template <typename int_t>
-    void generate_geometric_block(double p, int_t *arr, size_t size)
-    {
+    void generate_geometric_block(double p, int_t *arr, size_t size) {
         std::geometric_distribution<int_t> dist(p);
         for (size_t i = 0; i < size; ++i) {
             arr[i] = dist(generator_);
@@ -194,9 +190,7 @@ public:
 
     //! Generate `size` geometrically integers with parameter p
     template <typename int_t>
-    void generate_geometric_block(double p, std::vector<int_t> &output,
-                                  size_t size)
-    {
+    void generate_geometric_block(double p, std::vector<int_t> &output, size_t size) {
         if (size > output.size()) {
             output.resize(size);
         }
@@ -224,8 +218,8 @@ public:
 
     //! Generate `size` normally distributed integers with mean `mean` and
     //! standard deviation `stdev`
-    void generate_gaussian_block(double mean, double stdev,
-                                 double *arr, size_t size) {
+    void generate_gaussian_block(double mean, double stdev, double *arr,
+                                 size_t size) {
         std::normal_distribution<double> dist(mean, stdev);
         for (size_t i = 0; i < size; ++i) {
             arr[i] = dist(generator_);

@@ -6,8 +6,8 @@
  * Copyright (C) 2018-2019 Lorenz Hübschle-Schneider <lorenz@4z2.de>
  ******************************************************************************/
 
-#include <wrs/numa_array.hpp>
 #include <wrs/memory.hpp>
+#include <wrs/numa_array.hpp>
 #include <wrs/parallel_do.hpp>
 
 #include <tlx/logger.hpp>
@@ -27,11 +27,10 @@ static void* __numa_alloc(size_t bytes, bool align) {
     constexpr bool debug = true;
 
     size_t bytes_per_thread = (bytes + get_num_threads() - 1) / get_num_threads();
-    int threads_per_node = (get_num_threads() + get_num_nodes() - 1) /
-        get_num_nodes();
+    int threads_per_node =
+        (get_num_threads() + get_num_nodes() - 1) / get_num_nodes();
 
-    sLOG << "Allocating" << bytes << "bytes on" << get_num_nodes()
-         << "NUMA nodes";
+    sLOG << "Allocating" << bytes << "bytes on" << get_num_nodes() << "NUMA nodes";
 
     SSiloMemorySpec* specs = reinterpret_cast<SSiloMemorySpec*>(
         malloc(sizeof(SSiloMemorySpec) * get_num_nodes()));
@@ -44,7 +43,8 @@ static void* __numa_alloc(size_t bytes, bool align) {
     for (int i = 0; i < get_num_nodes(); ++i) {
         // Align sizes to 2MB
         size_t size = bytes_per_thread * (max - min);
-        if (align) size = align_size(size, 2048 * 1024);
+        if (align)
+            size = align_size(size, 2048 * 1024);
         specs[i].size = size;
         specs[i].numaNode = i;
         sLOG << "Thereof" << specs[i].size << "bytes on node" << i;
@@ -54,7 +54,7 @@ static void* __numa_alloc(size_t bytes, bool align) {
     }
 
     // Allocate the multi-node array. Uses transparent hugepages.
-    void *buffer = siloMultinodeArrayAlloc(get_num_nodes(), specs);
+    void* buffer = siloMultinodeArrayAlloc(get_num_nodes(), specs);
 
     return buffer;
 }
@@ -63,8 +63,8 @@ static void* __numa_alloc(size_t bytes, bool align) {
 // Allocate an array distributed over the available NUMA nodes
 void* numa_alloc(size_t bytes, bool align, bool local) {
 #ifndef WRS_HAVE_NUMA
-    (void) align;
-    (void) local;
+    (void)align;
+    (void)local;
     return allocate(bytes);
 #else
     constexpr bool debug = true;
@@ -74,7 +74,8 @@ void* numa_alloc(size_t bytes, bool align, bool local) {
     if (local || get_num_nodes() == 1) {
         // Allocate on a single node
         size_t size = bytes;
-        if (align) size = align_size(size, 2048*1024);
+        if (align)
+            size = align_size(size, 2048 * 1024);
         buffer = siloSimpleBufferAllocLocal(size);
     } else {
         // Do the actual distributed NUMA allocation

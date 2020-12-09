@@ -28,14 +28,15 @@ namespace wrs {
 
 template <template <typename> typename b_alias_type, typename size_type = uint32_t>
 struct multi_alias {
-    static constexpr const char* name = "multi";
+    static constexpr const char *name = "multi";
     static constexpr bool yields_single_sample = true;
     static constexpr bool init_with_seed = false;
     static constexpr int pass_rand = 2;
     using alias_type = b_alias_type<size_type>;
     using result_type = size_type;
 
-    static_assert((sizeof(double) / sizeof(size_type)) * sizeof(size_type) == sizeof(double),
+    static_assert((sizeof(double) / sizeof(size_type)) * sizeof(size_type) ==
+                      sizeof(double),
                   "size_type has weird size");
 
     static constexpr bool debug = false;
@@ -51,16 +52,16 @@ struct multi_alias {
         construct(w_begin, w_end);
     }
 
-    multi_alias & operator = (const multi_alias &) = default;
+    multi_alias &operator=(const multi_alias &) = default;
     multi_alias(const multi_alias &) = default;
     //! delete move-constructor
     multi_alias(multi_alias &&) = delete;
     //! delete move-assignment
-    multi_alias & operator = (multi_alias &&) = delete;
+    multi_alias &operator=(multi_alias &&) = delete;
 
     void init(size_t size) {
         num_subtables_ = get_num_threads();
-        size_= size;
+        size_ = size;
         subtables_.resize(num_subtables_);
         subtable_offsets_.resize(num_subtables_);
         subtable_weights_.resize(num_subtables_);
@@ -70,7 +71,8 @@ struct multi_alias {
         parallel_do_range(
             [&](size_t min, size_t max, int thread_id) {
                 subtables_[thread_id].init(max - min);
-            }, size_);
+            },
+            size_);
     }
 
     template <typename Iterator>
@@ -92,7 +94,7 @@ struct multi_alias {
         auto build_subtable = [&](size_t min, size_t max, int thread_id) {
             constexpr bool debug = false;
             sLOG << "Thread" << thread_id << "constructing subtable of size"
-            << max - min;
+                 << max - min;
             timer t;
             subtable_offsets_[thread_id] = min;
             subtables_[thread_id].construct(begin + min, begin + max);
@@ -107,8 +109,7 @@ struct multi_alias {
         for (size_t i = 0; i < num_subtables_; i++) {
             subtable_weights_[i] = subtables_[i].total_weight();
         }
-        top_level_.construct(subtable_weights_.begin(),
-                             subtable_weights_.end());
+        top_level_.construct(subtable_weights_.begin(), subtable_weights_.end());
         timers_.push_back(t.get_and_reset());
         LOGC(time) << "Step 2: top-level table construction took "
                    << timers_.back() << "ms";
@@ -142,15 +143,15 @@ struct multi_alias {
 
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
+    void find(size_type item, Callback &&callback) const {
         for (size_t table = 0; table < num_subtables_; ++table) {
             size_type offset = subtable_offsets_[table];
-            if (item < offset) continue;
+            if (item < offset)
+                continue;
 
-            auto cb =
-                [&](int, size_type idx, double w, auto &tableitem) {
-                    callback(table, idx + offset, w, tableitem);
-                };
+            auto cb = [&](int, size_type idx, double w, auto &tableitem) {
+                callback(table, idx + offset, w, tableitem);
+            };
             subtables_[table].find(item - offset, cb);
 
             if (table + 1 < num_subtables_ && item < subtable_offsets_[table + 1])

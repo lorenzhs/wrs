@@ -45,16 +45,17 @@
  *
  ******************************************************************************/
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #include "dSFMT.hpp"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 namespace wrs {
 namespace generators {
 
 // set the name
-const char* dSFMT::name = "dSFMT";
+const char *dSFMT::name = "dSFMT";
 
 namespace _dSFMT {
 
@@ -63,10 +64,8 @@ extern "C" {
 /*----------------
   STATIC FUNCTIONS
   ----------------*/
-inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array,
-				       int size);
-inline static void gen_rand_array_o0c1(dsfmt_t *dsfmt, w128_t *array,
-				       int size);
+inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array, int size);
+inline static void gen_rand_array_o0c1(dsfmt_t *dsfmt, w128_t *array, int size);
 inline static int idxof(int i);
 static void initial_mask(dsfmt_t *dsfmt);
 static void period_certification(dsfmt_t *dsfmt);
@@ -141,38 +140,36 @@ inline static void convert_o0c1(w128_t *w) {
  * @param array an 128-bit array to be filled by pseudorandom numbers.
  * @param size number of 128-bit pseudorandom numbers to be generated.
  */
-inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array,
-				       int size) {
+inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array, int size) {
     int i, j;
     w128_t lung;
 
     lung = dsfmt->status[DSFMT_N];
-    do_recursion(&array[0], &dsfmt->status[0], &dsfmt->status[DSFMT_POS1],
-		 &lung);
+    do_recursion(&array[0], &dsfmt->status[0], &dsfmt->status[DSFMT_POS1], &lung);
     for (i = 1; i < DSFMT_N - DSFMT_POS1; i++) {
-	do_recursion(&array[i], &dsfmt->status[i],
-		     &dsfmt->status[i + DSFMT_POS1], &lung);
+        do_recursion(&array[i], &dsfmt->status[i],
+                     &dsfmt->status[i + DSFMT_POS1], &lung);
     }
     for (; i < DSFMT_N; i++) {
-	do_recursion(&array[i], &dsfmt->status[i],
-		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+        do_recursion(&array[i], &dsfmt->status[i],
+                     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
     }
     for (; i < size - DSFMT_N; i++) {
-	do_recursion(&array[i], &array[i - DSFMT_N],
-		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
-	convert_c0o1(&array[i - DSFMT_N]);
+        do_recursion(&array[i], &array[i - DSFMT_N],
+                     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+        convert_c0o1(&array[i - DSFMT_N]);
     }
     for (j = 0; j < 2 * DSFMT_N - size; j++) {
-	dsfmt->status[j] = array[j + size - DSFMT_N];
+        dsfmt->status[j] = array[j + size - DSFMT_N];
     }
     for (; i < size; i++, j++) {
-	do_recursion(&array[i], &array[i - DSFMT_N],
-		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
-	dsfmt->status[j] = array[i];
-	convert_c0o1(&array[i - DSFMT_N]);
+        do_recursion(&array[i], &array[i - DSFMT_N],
+                     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+        dsfmt->status[j] = array[i];
+        convert_c0o1(&array[i - DSFMT_N]);
     }
     for (i = size - DSFMT_N; i < size; i++) {
-	convert_c0o1(&array[i]);
+        convert_c0o1(&array[i]);
     }
     dsfmt->status[DSFMT_N] = lung;
 }
@@ -185,38 +182,36 @@ inline static void gen_rand_array_c0o1(dsfmt_t *dsfmt, w128_t *array,
  * @param array an 128-bit array to be filled by pseudorandom numbers.
  * @param size number of 128-bit pseudorandom numbers to be generated.
  */
-inline static void gen_rand_array_o0c1(dsfmt_t *dsfmt, w128_t *array,
-				       int size) {
+inline static void gen_rand_array_o0c1(dsfmt_t *dsfmt, w128_t *array, int size) {
     int i, j;
     w128_t lung;
 
     lung = dsfmt->status[DSFMT_N];
-    do_recursion(&array[0], &dsfmt->status[0], &dsfmt->status[DSFMT_POS1],
-		 &lung);
+    do_recursion(&array[0], &dsfmt->status[0], &dsfmt->status[DSFMT_POS1], &lung);
     for (i = 1; i < DSFMT_N - DSFMT_POS1; i++) {
-	do_recursion(&array[i], &dsfmt->status[i],
-		     &dsfmt->status[i + DSFMT_POS1], &lung);
+        do_recursion(&array[i], &dsfmt->status[i],
+                     &dsfmt->status[i + DSFMT_POS1], &lung);
     }
     for (; i < DSFMT_N; i++) {
-	do_recursion(&array[i], &dsfmt->status[i],
-		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+        do_recursion(&array[i], &dsfmt->status[i],
+                     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
     }
     for (; i < size - DSFMT_N; i++) {
-	do_recursion(&array[i], &array[i - DSFMT_N],
-		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
-	convert_o0c1(&array[i - DSFMT_N]);
+        do_recursion(&array[i], &array[i - DSFMT_N],
+                     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+        convert_o0c1(&array[i - DSFMT_N]);
     }
     for (j = 0; j < 2 * DSFMT_N - size; j++) {
-	dsfmt->status[j] = array[j + size - DSFMT_N];
+        dsfmt->status[j] = array[j + size - DSFMT_N];
     }
     for (; i < size; i++, j++) {
-	do_recursion(&array[i], &array[i - DSFMT_N],
-		     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
-	dsfmt->status[j] = array[i];
-	convert_o0c1(&array[i - DSFMT_N]);
+        do_recursion(&array[i], &array[i - DSFMT_N],
+                     &array[i + DSFMT_POS1 - DSFMT_N], &lung);
+        dsfmt->status[j] = array[i];
+        convert_o0c1(&array[i - DSFMT_N]);
     }
     for (i = size - DSFMT_N; i < size; i++) {
-	convert_o0c1(&array[i]);
+        convert_o0c1(&array[i]);
     }
     dsfmt->status[DSFMT_N] = lung;
 }
@@ -262,21 +257,21 @@ static void period_certification(dsfmt_t *dsfmt) {
     inner &= 1;
     /* check OK */
     if (inner == 1) {
-	return;
+        return;
     }
     /* check NG, and modification */
 #if (DSFMT_PCV2 & 1) == 1
     dsfmt->status[DSFMT_N].u[1] ^= 1;
 #else
     for (i = 1; i >= 0; i--) {
-	work = 1;
-	for (j = 0; j < 64; j++) {
-	    if ((work & pcv[i]) != 0) {
-		dsfmt->status[DSFMT_N].u[i] ^= work;
-		return;
-	    }
-	    work = work << 1;
-	}
+        work = 1;
+        for (j = 0; j < 64; j++) {
+            if ((work & pcv[i]) != 0) {
+                dsfmt->status[DSFMT_N].u[i] ^= work;
+                return;
+            }
+            work = work << 1;
+        }
     }
 #endif
     return;
@@ -309,7 +304,7 @@ int dsfmt_get_min_array_size(void) {
 void dsfmt_fill_array_open_close(dsfmt_t *dsfmt, double array[], int size) {
     assert(size % 2 == 0);
     assert(size >= DSFMT_N64);
-    gen_rand_array_o0c1(dsfmt, reinterpret_cast<w128_t*>(array), size / 2);
+    gen_rand_array_o0c1(dsfmt, reinterpret_cast<w128_t *>(array), size / 2);
 }
 
 /**
@@ -327,11 +322,11 @@ void dsfmt_fill_array_open_close(dsfmt_t *dsfmt, double array[], int size) {
 void dsfmt_fill_array_close_open(dsfmt_t *dsfmt, double array[], int size) {
     assert(size % 2 == 0);
     assert(size >= DSFMT_N64);
-    gen_rand_array_c0o1(dsfmt, reinterpret_cast<w128_t*>(array), size / 2);
+    gen_rand_array_c0o1(dsfmt, reinterpret_cast<w128_t *>(array), size / 2);
 }
 
 #if defined(__INTEL_COMPILER)
-#  pragma warning(disable:981)
+#pragma warning(disable : 981)
 #endif
 /**
  * This function initializes the internal state array with a 32-bit
@@ -346,21 +341,21 @@ void dsfmt_chk_init_gen_rand(dsfmt_t *dsfmt, uint32_t seed, int mexp) {
 
     /* make sure caller program is compiled with the same MEXP */
     if (mexp != DSFMT_MEXP) {
-	fprintf(stderr, "DSFMT_MEXP doesn't match with dSFMT.c\n");
-	exit(1);
+        fprintf(stderr, "DSFMT_MEXP doesn't match with dSFMT.c\n");
+        exit(1);
     }
     psfmt = &dsfmt->status[0].u32[0];
     psfmt[idxof(0)] = seed;
     for (i = 1; i < (DSFMT_N + 1) * 4; i++) {
-        psfmt[idxof(i)] = 1812433253UL
-	    * (psfmt[idxof(i - 1)] ^ (psfmt[idxof(i - 1)] >> 30)) + i;
+        psfmt[idxof(i)] =
+            1812433253UL * (psfmt[idxof(i - 1)] ^ (psfmt[idxof(i - 1)] >> 30)) + i;
     }
     initial_mask(dsfmt);
     period_certification(dsfmt);
     dsfmt->idx = DSFMT_N64;
 }
 #if defined(__INTEL_COMPILER)
-#  pragma warning(default:981)
+#pragma warning(default : 981)
 #endif
 
 } // extern "C"

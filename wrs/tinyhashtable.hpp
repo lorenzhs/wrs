@@ -28,22 +28,23 @@ public:
         val_t val;
         entry() : key(empty), val(0) {}
         entry(const key_t &k, const val_t &v) : key(k), val(v) {}
-        bool operator==(const entry &other) const { return key == other.key; }
+        bool operator==(const entry &other) const {
+            return key == other.key;
+        }
     };
-    friend std::ostream &operator << (std::ostream &os, const entry &e) {
+    friend std::ostream &operator<<(std::ostream &os, const entry &e) {
         return os << '(' << e.key << ',' << e.val << ')';
     }
 
     // need to call clear before use!!!
     explicit tinyhashtable(size_t max_size)
-        : size_(4 * tlx::round_up_to_power_of_two(max_size))
-        , mask_((size_ >> 1) - 1)
-        , table_(max_size == 0 ? nullptr : std::make_unique<entry[]>(size_))
-    {}
+        : size_(4 * tlx::round_up_to_power_of_two(max_size)),
+          mask_((size_ >> 1) - 1),
+          table_(max_size == 0 ? nullptr : std::make_unique<entry[]>(size_)) {}
 
-    val_t& operator[](const key_t &key) {
+    val_t &operator[](const key_t &key) {
         size_t pos = key & mask_;
-        entry *e  = table_.get() + pos;
+        entry *e = table_.get() + pos;
         while (e->key != empty && e->key != key) {
             e++;
             assert(e - table_.get() < static_cast<ssize_t>(size_));
@@ -58,9 +59,9 @@ public:
     }
 
     template <typename Callback>
-    void foreach(Callback && callback) const {
-        entry* it = table_.get();
-        const entry* end = table_.get() + size_;
+    void foreach (Callback &&callback) const {
+        entry *it = table_.get();
+        const entry *end = table_.get() + size_;
         while (it != end) {
             if (it->key != empty)
                 callback(it->key, it->val);

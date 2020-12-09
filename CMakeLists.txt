@@ -171,15 +171,6 @@ elseif(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4503")
 endif()
 
-
-if(WRS_USE_LTO)
-  # build with link-time optimization
-  include(CheckIPOSupported)
-  check_ipo_supported()
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-  set(TLX_USE_LTO ON CACHE BOOL "enable LTO for tlx")
-endif()
-
 if(APPLE)
   # disable warnings about "ranlib: file: libsampling.a(...cpp.o) has no symbols"
   set(CMAKE_C_ARCHIVE_FINISH   "<CMAKE_RANLIB> -no_warning_for_no_symbols -c <TARGET>")
@@ -190,14 +181,23 @@ message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 ###############################################################################
 
-# set_join(VAR "foo" "bar" "abc") sets VAR="foo bar abc"
-macro(set_join var)
-  set(${var})
-  foreach(v ${ARGN})
-    set(${var} "${${var}} ${v}")
-  endforeach()
-  string(STRIP ${var} "${${var}}")
-endmacro(set_join)
+# use googletest
+set(BUILD_GMOCK OFF CACHE BOOL "don't build gmock")
+set(INSTALL_GTEST OFF CACHE BOOL "don't install googletest")
+add_subdirectory(extlib/googletest)
+
+# enable LTO after including googletest, it doesn't handle it too nicely
+if(WRS_USE_LTO)
+  # build with link-time optimization
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT result OUTPUT output LANGUAGES CXX)
+  if (result)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+    set(TLX_USE_LTO ON CACHE BOOL "enable LTO for tlx")
+  else()
+    message(SEND_ERROR "IPO is not supported but enabled: ${output}")
+  endif()
+endif()
 
 ################################################################################
 
@@ -208,6 +208,7 @@ set(WRS_LINK_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${WRS_LINK_LIBRARIES})
 if(CMAKE_USE_PTHREADS_INIT)
   set(WRS_LINK_LIBRARIES pthread atomic ${WRS_LINK_LIBRARIES})
 endif()
+
 
 # use tlx
 
@@ -268,6 +269,7 @@ endif()
 
 # glob general sources
 file(GLOB_RECURSE WRS_SOURCES "${PROJECT_SOURCE_DIR}/wrs/*.[ch]pp")
+file(GLOB_RECURSE TEST_FILES  "${PROJECT_SOURCE_DIR}/tests/*.[ch]pp")
 file(GLOB_RECURSE EXECUTABLES "${PROJECT_SOURCE_DIR}/benchmark/*.cpp")
 
 ################################################################################
@@ -289,5 +291,15 @@ foreach(target ${EXECUTABLES})
   target_link_libraries(${target_name} ${EXEC_LINK_LIBRARIES})
 endforeach(target)
 unset(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+
+################################################################################
+### Build the tests
+
+enable_testing()
+include(GoogleTest)
+add_executable(tests ${TEST_FILES} ${WRS_SRCS})
+target_compile_definitions(tests PRIVATE WRS_IS_TEST)
+target_link_libraries(tests wrs gtest)
+gtest_add_tests(tests "" ${TEST_FILES})
 
 ################################################################################

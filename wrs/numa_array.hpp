@@ -36,9 +36,10 @@ template <typename T>
 using numa_arr_ptr = std::unique_ptr<T[], numa_deleter>;
 
 // Helper function to create a numa_arr_ptr akin to std::make_unique
-template <typename T, typename ...Args>
-numa_arr_ptr<T> make_numa_arr(size_t num_elems, Args...args) {
-    T* ptr = static_cast<T*>(numa_alloc(num_elems * sizeof(T), std::forward<Args>(args)...));
+template <typename T, typename... Args>
+numa_arr_ptr<T> make_numa_arr(size_t num_elems, Args... args) {
+    T* ptr = static_cast<T*>(
+        numa_alloc(num_elems * sizeof(T), std::forward<Args>(args)...));
     return numa_arr_ptr<T>(ptr);
 }
 

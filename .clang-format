@@ -29,20 +29,26 @@ IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: '".*'
     Priority: 0
-  - Regex: '<(wrs|benchmark)\/'
+  - Regex: '<benchmark\/'
     Priority: 1
-  - Regex: '<tlx\/'
-    Priority: 3
-  - Regex: '<boost\/'
-    Priority: 8
-  - Regex: '<.*\/.*\.(h|hpp)>'
+  - Regex: '<tests\/'
+    Priority: 2
+  - Regex: '<wrs\/'
     Priority: 5
-  - Regex: '<[^\/]+\.(h|hpp)>'
-    Priority: 9
-  - Regex: '<.*\/'
-    Priority: 7
-  - Regex: '<[^\/]+>'
+  - Regex: '<extlib\/'
+    Priority: 8
+  - Regex: '<tlx\/'
     Priority: 10
+  - Regex: '<boost\/'
+    Priority: 20
+  - Regex: '<.*\/.*\.(h|hpp)>'
+    Priority: 30
+  - Regex: '<[^\/]+\.(h|hpp)>'
+    Priority: 40
+  - Regex: '<.*\/'
+    Priority: 50
+  - Regex: '<[^\/]+>'
+    Priority: 100
 IndentCaseLabels: 'true'
 IndentPPDirectives: None
 IndentWidth: '4'
@@ -50,7 +56,7 @@ IndentWrappedFunctionNames: 'false'
 KeepEmptyLinesAtTheStartOfBlocks: 'false'
 MaxEmptyLinesToKeep: '2'
 NamespaceIndentation: None
-PenaltyExcessCharacter: '5'
+PenaltyExcessCharacter: '4'
 SortIncludes: 'true'
 SpaceAfterLogicalNot: 'false'
 SpaceAfterTemplateKeyword: 'true'

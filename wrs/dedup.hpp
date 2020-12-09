@@ -27,7 +27,7 @@ public:
     using result_type = typename alias_t::result_type;
     using size_type = size_t; // for now?
 
-    explicit dedup(size_t seed = 0) : rng_(seed) { }
+    explicit dedup(size_t seed = 0) : rng_(seed) {}
 
     template <typename Iterator>
     dedup(Iterator begin, Iterator end, size_t seed = 0) : rng_(seed) {
@@ -49,7 +49,7 @@ public:
     }
 
     template <typename Callback>
-    size_t sample(Callback && callback, size_t num_samples) {
+    size_t sample(Callback&& callback, size_t num_samples) {
         hash_table_.clear_no_resize();
         for (size_t i = 0; i < num_samples; i++) {
             result_type sample = alias_table_.sample(rng_.next());
@@ -65,22 +65,28 @@ public:
 
     // interface hack for compatibility with outsens / par_outsens
     template <typename Ignored, typename Callback>
-    size_t sample(Ignored, Callback && callback, size_t num_samples) {
+    size_t sample(Ignored, Callback&& callback, size_t num_samples) {
         return sample(callback, num_samples);
     }
 
-    size_t size() const { return alias_table_.size(); }
+    size_t size() const {
+        return alias_table_.size();
+    }
 
-    double total_weight() const { return alias_table_.total_weight(); }
+    double total_weight() const {
+        return alias_table_.total_weight();
+    }
 
-    std::vector<double> get_timers() const { return alias_table_.get_timers(); }
+    std::vector<double> get_timers() const {
+        return alias_table_.get_timers();
+    }
 
-    void verify_helper(std::vector<double> &weights, size_t offset) const {
+    void verify_helper(std::vector<double>& weights, size_t offset) const {
         alias_table_.verify_helper(weights, offset);
     }
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
+    void find(size_type item, Callback&& callback) const {
         alias_table_.find(item, callback);
     }
 
@@ -101,7 +107,7 @@ public:
     using result_type = typename alias_t::result_type;
     using size_type = size_t; // for now?
 
-    explicit store_vec(size_t seed = 0) : rng_(seed) { }
+    explicit store_vec(size_t seed = 0) : rng_(seed) {}
 
     template <typename Iterator>
     store_vec(Iterator begin, Iterator end, size_t seed = 0) : rng_(seed) {
@@ -120,7 +126,7 @@ public:
     }
 
     template <typename Callback>
-    size_t sample(Callback && callback, size_t num_samples) {
+    size_t sample(Callback&& callback, size_t num_samples) {
         samples_.clear();
         samples_.reserve(num_samples);
         for (size_t i = 0; i < num_samples; i++) {
@@ -134,22 +140,28 @@ public:
 
     // interface hack for compatibility with outsens / par_outsens
     template <typename Ignored, typename Callback>
-    size_t sample(Ignored, Callback && callback, size_t num_samples) {
+    size_t sample(Ignored, Callback&& callback, size_t num_samples) {
         return sample(callback, num_samples);
     }
 
-    size_t size() const { return alias_table_.size(); }
+    size_t size() const {
+        return alias_table_.size();
+    }
 
-    double total_weight() const { return alias_table_.total_weight(); }
+    double total_weight() const {
+        return alias_table_.total_weight();
+    }
 
-    std::vector<double> get_timers() const { return alias_table_.get_timers(); }
+    std::vector<double> get_timers() const {
+        return alias_table_.get_timers();
+    }
 
-    void verify_helper(std::vector<double> &weights, size_t offset) const {
+    void verify_helper(std::vector<double>& weights, size_t offset) const {
         alias_table_.verify_helper(weights, offset);
     }
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
+    void find(size_type item, Callback&& callback) const {
         alias_table_.find(item, callback);
     }
 
@@ -157,7 +169,6 @@ protected:
     alias_t alias_table_;
     std::vector<result_type> samples_;
     wrs::generators::select_t rng_;
-
 };
 
 } // namespace wrs

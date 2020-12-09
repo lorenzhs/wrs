@@ -32,7 +32,7 @@ namespace wrs {
 template <typename size_type = uint32_t>
 class simple_scan_alias {
 public:
-    static constexpr const char* name = "simplescan";
+    static constexpr const char *name = "simplescan";
     static constexpr bool yields_single_sample = true;
     static constexpr bool init_with_seed = false;
     static constexpr int pass_rand = 1;
@@ -48,7 +48,7 @@ public:
         tableitem(double p_, size_type a_) : p(p_), a(a_) {}
     };
 
-    friend std::ostream &operator << (std::ostream &os, const tableitem &item) {
+    friend std::ostream &operator<<(std::ostream &os, const tableitem &item) {
         return os << '(' << item.p << ',' << item.a << ')';
     }
 
@@ -63,7 +63,7 @@ public:
         construct(w_begin, w_end);
     }
 
-    simple_scan_alias & operator = (const simple_scan_alias & other) {
+    simple_scan_alias &operator=(const simple_scan_alias &other) {
         LOG0 << "simple_scan_alias copy assignment/constructor called";
         size_ = other.size_;
         W_ = other.W_;
@@ -83,7 +83,7 @@ public:
     //! delete move-constructor
     simple_scan_alias(simple_scan_alias &&) = delete;
     //! delete move-assignment
-    simple_scan_alias & operator = (simple_scan_alias &&) = delete;
+    simple_scan_alias &operator=(simple_scan_alias &&) = delete;
 
     void init(size_t size) {
         table_ = make_alloc_arr<tableitem>(size);
@@ -112,9 +112,24 @@ public:
         LOGC(time) << "Step 0: preprocessing took " << timers_.back() << "ms";
 
         Iterator i = begin, j = begin;
-        while (i != end && !is_light(*i)) i++; // light item
-        while (j != end &&  is_light(*j)) j++; // heavy item
+        while (i != end && !is_light(*i))
+            i++; // light item
+        while (j != end && is_light(*j))
+            j++; // heavy item
         double w = (j != end) ? *j : 0; // residual weight of current heavy item
+        if (j == end) {
+            // Only light items, meaning every item has to be of weight W/n
+            // (most likely, there is only one item), and this isn't even really
+            // weighted sampling
+            sLOG << "No heavy item found of a total of" << size_ << "items";
+            while (i != end) {
+                size_type iidx = i - begin;
+                assert(std::abs(W_n_ - *i) < 1e-8);
+                table_[iidx].p = *i;
+                table_[iidx].a = iidx;
+                i++;
+            }
+        }
         // Can't fill if only light or heavy items
         while (TLX_LIKELY(j != end)) {
             if (is_light(w)) {
@@ -132,7 +147,8 @@ public:
                          << "i =" << i - begin << "j =" << jidx << "w =" << w;
                     assert(std::abs(W_n_ - w) < 1e-8);
                     table_[jidx].p = W_n_;
-                    table_[jidx].a = jidx; // w is W/n, this is just for numerical weirdness
+                    table_[jidx].a =
+                        jidx; // w is W/n, this is just for numerical weirdness
                     for (Iterator k = i; k != end; ++k) {
                         assert(is_light(*k));
                         assert(std::abs(W_n_ - *k) < 1e-8);
@@ -165,7 +181,9 @@ public:
                 table_[iidx].p = *i;
                 table_[iidx].a = j - begin;
                 w = (w + *i) - W_n_;
-                do { i++; } while (i != end && !is_light(*i));
+                do {
+                    i++;
+                } while (i != end && !is_light(*i));
                 if (i == end) {
                     sLOG << "residual heavy item" << j - begin
                          << "was still heavy but search for next light item"
@@ -178,32 +196,37 @@ public:
         timers_.push_back(t.get_and_reset());
         LOGC(time) << "Step 1: table construction took " << timers_.back() << "ms";
 
-        if constexpr(debug) {
+        if constexpr (debug) {
             LOG_ARR(table_.get(), "table");
         }
-
     }
 
 
     // Query given a uniformly distributed [0,1) random value
-    size_type sample(double uniform) const {
-        double rand = uniform * size_;
-        size_t index = rand;
-        tableitem& item = table_[index];
+    size_type sample(double rand) const {
+        // scale up to table size
+        rand *= size_;
 
-        // sanity check: if alias == -1, then prob == 1
+        // Copy the item's index and its alias into temp_
+        size_type candidates[2];
+        candidates[0] = static_cast<size_type>(rand); // bucket ID (index)
+        candidates[1] = table_[candidates[0]].a; // fetch bucket alias
+
+        // reference to the item, for convenience
+        tableitem &item = table_[candidates[0]];
+        // sanity check: if the item doesn't have an alias, then it must fill
+        // the bucket on its own
         assert(item.a != empty || std::abs(item.p - W_n_) < 1e-7);
 
-        rand = (rand - index) * W_n_;
-        assert(rand < item.p || item.a != empty);
-        return (rand < item.p) ? index : item.a;
+        // scale remaining randomness to range of bucket weights
+        rand = (rand - candidates[0]) * W_n_;
+        return candidates[rand >= item.p];
     }
 
     // Sum up all weights in the table, adding `offset` to every item ID.
     // This is used internally by verify() and by multi_alias' verify()
     void verify_helper(std::vector<double> &weights, size_t offset) const {
-        wrs::sum_table<size_type>(
-            table_.get(), size_, W_, W_n_, weights, offset);
+        wrs::sum_table<size_type>(table_.get(), size_, W_, W_n_, weights, offset);
     }
 
     std::vector<double> get_timers() const {
@@ -219,9 +242,11 @@ public:
     }
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
-        if (size_ == static_cast<size_t>(-1)) return;
-        callback(0, item, table_[item].p, table_[item]);
+    void find(size_type item, Callback &&callback) const {
+        if (size_ == static_cast<size_t>(-1))
+            return;
+        if (item < size_)
+            callback(0, item, table_[item].p, table_[item]);
         for (size_t i = 0; i < size_; i++) {
             if (table_[i].a == item) {
                 callback(0, i, W_n_ - table_[i].p, table_[i]);
@@ -230,9 +255,8 @@ public:
     }
 
 protected:
-
     TLX_ATTRIBUTE_ALWAYS_INLINE
-    bool is_light(const double& d) const {
+    bool is_light(const double &d) const {
         return d <= W_n_;
     }
 

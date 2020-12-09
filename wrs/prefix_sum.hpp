@@ -21,14 +21,14 @@ namespace wrs {
 template <typename InputIterator, typename OutputIterator, typename Op,
           typename T = typename std::iterator_traits<InputIterator>::value_type>
 OutputIterator exclusive_scan(InputIterator begin, InputIterator end,
-                              OutputIterator out_begin, Op && op, T initial,
-                              bool include_last = false /* write last item? */)
-{
+                              OutputIterator out_begin, Op &&op, T initial,
+                              bool include_last = false /* write last item? */) {
     const bool debug = false;
 
     sLOG << "exclusive_scan over" << end - begin << "elements"
          << (include_last ? "including" : "excluding") << "last write";
-    if (begin == end) return out_begin;
+    if (begin == end)
+        return out_begin;
 
     T temp = *begin;
     *out_begin = initial;
@@ -48,8 +48,7 @@ OutputIterator exclusive_scan(InputIterator begin, InputIterator end,
 
 template <typename InputIterator, typename OutputIterator, typename Op>
 void parallel_scan(InputIterator begin, InputIterator end,
-                   OutputIterator out_begin, Op &&op)
-{
+                   OutputIterator out_begin, Op &&op) {
     size_t size = end - begin;
     using value_type = decltype(op(*begin, *begin));
     std::vector<value_type> temp(get_num_threads() + 1);

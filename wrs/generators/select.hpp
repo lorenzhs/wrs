@@ -20,6 +20,9 @@ namespace wrs {
 namespace generators {
 
 struct select {
+#ifdef WRS_IS_TEST
+    using type = dSFMT;
+#else
 #ifdef WRS_HAVE_MKL
     // MKL is much faster than anything else, by a factor that's not even funny
     // any more for large block sizes
@@ -29,6 +32,7 @@ struct select {
     // gcc, and more using clang. It's practically never slower, so prefer it.
     using type = dSFMT;
 #endif // WRS_HAVE_MKL
+#endif // WRS_IS_TEST
 };
 
 using select_t = select::type;

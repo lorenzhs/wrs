@@ -18,8 +18,8 @@
 #include <wrs/prefix_sum.hpp>
 #include <wrs/util.hpp>
 
-#include <tlx/math.hpp>
 #include <tlx/logger.hpp>
+#include <tlx/math.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -33,25 +33,25 @@ namespace wrs {
 template <typename size_type, bool dedup, size_t bc_size>
 class outsens {
     static constexpr bool debug = false;
+
 public:
-    static constexpr const char* name = "seqoutsens";
+    static constexpr const char *name = "seqoutsens";
     static constexpr bool yields_single_sample = false;
     static constexpr bool init_with_seed = true;
     using result_type = size_type;
     using subtree = wrs::dctree<size_type, dedup, bc_size>;
 
-    explicit outsens(size_t seed = 0) : size_(-1), num_groups_(-1), W_(0)
-                                      , stoc_(seed), rng_(seed + 1) {}
+    explicit outsens(size_t seed = 0)
+        : size_(-1), num_groups_(-1), W_(0), stoc_(seed), rng_(seed + 1) {}
 
     template <typename Iterator>
     outsens(Iterator begin, Iterator end, size_type id_offset = 0, size_t seed = 0)
-        : stoc_(seed), rng_(seed + 1)
-    {
+        : stoc_(seed), rng_(seed + 1) {
         init(end - begin, seed);
         construct(begin, end, id_offset);
     }
 
-    outsens & operator = (const outsens & other) {
+    outsens &operator=(const outsens &other) {
         LOG0 << "outsens copy assignment/constructor called";
         size_ = other.size_;
         num_groups_ = other.num_groups_;
@@ -66,7 +66,8 @@ public:
             }
 
             groupsize_ = std::make_unique<size_type[]>(num_groups_);
-            memcpy(groupsize_.get(), other.groupsize_.get(), num_groups_ * sizeof(size_type));
+            memcpy(groupsize_.get(), other.groupsize_.get(),
+                   num_groups_ * sizeof(size_type));
         } else {
             groups_ = nullptr;
             groupsize_ = nullptr;
@@ -76,15 +77,16 @@ public:
         rng_.seed(stoc_.Random() * std::numeric_limits<size_t>::max());
         return *this;
     }
-    outsens(const outsens &other) : stoc_(other.stoc_)
-                                    // seed from stoc to get a deterministic result
-                                  , rng_(stoc_.Random() * std::numeric_limits<size_t>::max()) {
+    outsens(const outsens &other)
+        : stoc_(other.stoc_),
+          // seed from stoc to get a deterministic result
+          rng_(stoc_.Random() * std::numeric_limits<size_t>::max()) {
         *this = other;
     }
     //! delete move-constructor
     outsens(outsens &&) = delete;
     //! delete move-assignment
-    outsens & operator = (outsens &&) = delete;
+    outsens &operator=(outsens &&) = delete;
 
     void init(size_t size, size_t seed) {
         size_ = size;
@@ -152,26 +154,30 @@ public:
     }
 
     template <typename Callback>
-    void sample(Callback && callback, size_t num_samples) const {
+    void sample(Callback &&callback, size_t num_samples) const {
         // assign without early aborting because group weights can be *very*
         // different, rejection sampling could take forever
         group_tree_.assign(
-            num_samples, [&](size_t group, size_t samples) {
+            num_samples,
+            [&](size_t group, size_t samples) {
                 sLOG << "Group" << group << "got" << samples << "samples";
                 groups_[group].assign_early_abort(samples, callback, stoc_, rng_);
-            }, stoc_);
+            },
+            stoc_);
     }
 
     // Sample with explicit RNG
     template <typename Callback>
-    void sample(StochasticLib1 &rng, Callback && callback, size_t num_samples) const {
+    void sample(StochasticLib1 &rng, Callback &&callback, size_t num_samples) const {
         // assign without early aborting because group weights can be *very*
         // different, rejection sampling could take forever
         group_tree_.assign(
-            num_samples, [&](size_t group, size_t samples) {
+            num_samples,
+            [&](size_t group, size_t samples) {
                 sLOG << "Group" << group << "got" << samples << "samples";
                 groups_[group].assign_early_abort(samples, callback, rng, stoc_);
-            }, stoc_);
+            },
+            stoc_);
     }
 
     double total_weight() const {
@@ -184,7 +190,8 @@ public:
 
     // for internal use only
     void verify_helper(std::vector<double> &weights, size_t) const {
-        if (size_ == static_cast<size_t>(-1)) return;
+        if (size_ == static_cast<size_t>(-1))
+            return;
         for (size_t i = 0; i < num_groups_; ++i) {
             size_t num_leaves = groupsize_[i];
             for (size_t j = 0; j < num_leaves; ++j) {
@@ -195,16 +202,16 @@ public:
     }
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
+    void find(size_type item, Callback &&callback) const {
         for (size_t group = 0; group < num_groups_; ++group) {
-            auto cb = [&](int, size_type idx, double w, auto bucket)
-                      { callback(group, idx, w, bucket); };
+            auto cb = [&](int, size_type idx, double w, auto bucket) {
+                callback(group, idx, w, bucket);
+            };
             groups_[group].find(item, cb);
         }
     }
 
 protected:
-
     template <typename Iterator>
     void do_init(Iterator begin, Iterator end) {
         auto [minit, maxit] = std::minmax_element(begin, end);
@@ -237,21 +244,22 @@ protected:
 template <typename size_type = int32_t, bool dedup = true, size_t bc_size = 128>
 class par_outsens {
     static constexpr bool debug = false;
+
 public:
-    static constexpr const char* name = "paroutsens";
+    static constexpr const char *name = "paroutsens";
     static constexpr bool yields_single_sample = false;
     static constexpr bool init_with_seed = true;
     using result_type = size_type;
     using outsens = wrs::outsens<size_type, dedup, bc_size>;
 
-    par_outsens() {   }
+    par_outsens() {}
 
     template <typename Iterator>
     par_outsens(Iterator begin, Iterator end, size_t seed) {
         init(end - begin, seed);
         construct(begin, end);
     }
-    par_outsens & operator = (const par_outsens & other) {
+    par_outsens &operator=(const par_outsens &other) {
         LOG0 << "par_outsens copy assignment/constructor called";
         size_ = other.size_;
         count_ = other.count_;
@@ -271,7 +279,7 @@ public:
     //! delete move-constructor
     par_outsens(par_outsens &&) = delete;
     //! delete move-assignment
-    par_outsens & operator = (par_outsens &&) = delete;
+    par_outsens &operator=(par_outsens &&) = delete;
 
 
     void init(size_t size, size_t seed) {
@@ -297,18 +305,18 @@ public:
         }
 
         LOG << "Constructing subsamplers";
-        auto subconstruct =
-            [&](size_t min, size_t max, int thread) {
-                sLOG << "Thread" << thread << "constructing table for"
-                     << max - min << "items, range" << min << "to" << max;
-                samplers_[thread].init(max - min, seeds_[thread]);
-                samplers_[thread].construct(begin + min, begin + max, min);
-            };
+        auto subconstruct = [&](size_t min, size_t max, int thread) {
+            sLOG << "Thread" << thread << "constructing table for" << max - min
+                 << "items, range" << min << "to" << max;
+            samplers_[thread].init(max - min, seeds_[thread]);
+            samplers_[thread].construct(begin + min, begin + max, min);
+        };
         parallel_do_range(subconstruct, size_);
 
         LOG << "Constructing dc-tree over subsamplers";
         for (size_t i = 0; i < count_; i++) {
-            sLOG << "subsampler" << i << "has weight" << samplers_[i].total_weight();
+            sLOG << "subsampler" << i << "has weight"
+                 << samplers_[i].total_weight();
             tree_.set_leaf(i, i, samplers_[i].total_weight());
         }
         tree_.construct();
@@ -316,7 +324,7 @@ public:
     }
 
     template <typename Callback>
-    size_t sample(StochasticLib1 &rng, Callback && callback, size_t num_samples) {
+    size_t sample(StochasticLib1 &rng, Callback &&callback, size_t num_samples) {
         thread_local size_t local_count; // initialised later
         std::atomic<size_t> global_count = 0;
         // Wrap callback to keep track
@@ -325,7 +333,8 @@ public:
             ++local_count;
         };
         tree_.assign(
-            num_samples, [&](size_t id, size_t samples) {
+            num_samples,
+            [&](size_t id, size_t samples) {
                 sLOG << "Subsampler" << id << "got" << samples << "samples";
                 wrs::do_for_thread(
                     [&, id, samples]() {
@@ -336,8 +345,10 @@ public:
                         sLOG << "Thread" << id << "took" << t.get() << "ms for"
                              << samples << "samples, got" << local_count
                              << "unique elements";
-                    }, id);
-            }, rng);
+                    },
+                    id);
+            },
+            rng);
         wrs::wait_all_threads();
         sLOG << "Overall," << global_count << "of" << num_samples << "were unique";
         return global_count;
@@ -366,10 +377,11 @@ public:
     }
 
     template <typename Callback>
-    void find(size_type item, Callback && callback) const {
+    void find(size_type item, Callback &&callback) const {
         for (size_t i = 0; i < count_; i++) {
-            auto cb = [&](int group, auto idx, double w, auto &bucket)
-                      { callback(std::make_pair(i, group), idx, w, bucket); };
+            auto cb = [&](int group, auto idx, double w, auto &bucket) {
+                callback(std::make_pair(i, group), idx, w, bucket);
+            };
             samplers_[i].find(item, cb);
         }
     }

@@ -20,8 +20,7 @@ namespace wrs {
 namespace _detail {
 
 template <typename value_type>
-value_type accumulate_clobber(value_type *first, value_type *last, value_type init)
-{
+value_type accumulate_clobber(value_type *first, value_type *last, value_type init) {
     constexpr static size_t blocksize = 128;
 
     const size_t size = last - first;
@@ -33,8 +32,7 @@ value_type accumulate_clobber(value_type *first, value_type *last, value_type in
     for (size_t block = 0; block < num_blocks; block++) {
         *(first + block) = std::accumulate(
             first + block * blocksize,
-            std::min(first + (block + 1) * blocksize, last),
-            value_type{});
+            std::min(first + (block + 1) * blocksize, last), value_type{});
     }
     return accumulate_clobber(first, first + num_blocks, init);
 }
@@ -56,11 +54,11 @@ value_type accumulate(Iterator first, Iterator last, value_type init) {
     for (size_t block = 0; block < num_blocks; block++) {
         blocksum[block] = std::accumulate(
             first + block * blocksize,
-            std::min(first + (block + 1) * blocksize, last),
-            value_type{});
+            std::min(first + (block + 1) * blocksize, last), value_type{});
     }
     // recurse without further allocations
-    return _detail::accumulate_clobber(blocksum.get(), blocksum.get() + num_blocks, init);
+    return _detail::accumulate_clobber(blocksum.get(),
+                                       blocksum.get() + num_blocks, init);
 }
 
 

@@ -28,13 +28,15 @@ struct splitter {
     double split_weight_left, split_weight_right;
     bool has_split_item, right_owns_split;
 
-    friend std::ostream &operator << (std::ostream &os, const splitter &s) {
+    friend std::ostream &operator<<(std::ostream &os, const splitter &s) {
+        // clang-format off
         return os << "splitter(l_end=" << s.l_end
                   << " h_split=" << s.h_split
                   << " split=(?" << s.has_split_item
                   << " O" << s.right_owns_split
                   << " lw=" << s.split_weight_left
                   << " rw=" << s.split_weight_right << "))";
+        // clang-format on
     }
 };
 
@@ -53,14 +55,14 @@ struct subproblem {
 
     bool sanity_check() const {
         if ((l_end - l_begin) + (h_end - h_begin) - has_right_boundary != size) {
-            sLOG1 << "size sanity check failed:" << l_end - l_begin
-                  << "+" << h_end - h_begin << "="
+            sLOG1 << "size sanity check failed:" << l_end - l_begin << "+"
+                  << h_end - h_begin << "="
                   << (l_end - l_begin) + (h_end - h_begin) << "!=" << size;
-            assert((l_end - l_begin) + (h_end - h_begin) - has_right_boundary == size);
+            assert((l_end - l_begin) + (h_end - h_begin) - has_right_boundary ==
+                   size);
             return false;
         }
-        if (has_left_boundary && has_right_boundary)
-        {
+        if (has_left_boundary && has_right_boundary) {
             assert(!has_left_boundary || !has_right_boundary);
             return false;
         }
@@ -68,7 +70,8 @@ struct subproblem {
         return true;
     }
 
-    friend std::ostream &operator << (std::ostream &os, const subproblem &p) {
+    friend std::ostream &operator<<(std::ostream &os, const subproblem &p) {
+        // clang-format off
         return os << "subproblem(l=" << p.l_begin << ".." << p.l_end
                   << "#" << p.num_light
                   << " h=" << p.h_begin << ".." << p.h_end
@@ -78,8 +81,8 @@ struct subproblem {
                   << " W" << p.left_boundary_weight
                   << ") rb=(?" << p.has_right_boundary
                   << " W" << p.right_boundary_weight << "))";
+        // clang-format on
     }
-
 };
 
 } // namespace psa

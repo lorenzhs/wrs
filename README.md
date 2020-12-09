@@ -1,6 +1,8 @@
 # Parallel Weighted Random Sampling
 
-This is the code to accompany our eponymous paper: *Hübschle-Schneider, L., & Sanders, P. (2019). Parallel Weighted Random Sampling. In 27th Annual European Symposium on Algorithms (ESA 2019).*
+This code implements sequential and parallel methods for weighted random sampling, as described in our eponymous paper: *Hübschle-Schneider, L., & Sanders, P. (2019). Parallel Weighted Random Sampling. In 27th Annual European Symposium on Algorithms (ESA 2019).*
+
+The current state of the repository represents the most up-to-date version and was used for the evaluation of the weighted sampling chapter in my dissertation (link to follow).  The version used for the experiments in our ESA paper is available as the [`esa` tag](https://github.com/lorenzhs/wrs/tree/esa).
 
 The paper is freely accessible under a Creative Commons license (CC-BY) [on the publisher's website](https://drops.dagstuhl.de/opus/volltexte/2019/11180/).
 
@@ -32,9 +34,6 @@ Build with cmake (version 3.9.2 or later is required). Remember to fetch the sub
 
 ### Experiments
 
-To reproduce our experiments, compile using cmake and execute [benchmark/bench_all.sh](benchmark/bench_all.sh) from your build directory.
-Note that this script targets a machine with 80 cores (160 threads).  A version for 32 cores (64 threads) is provided in [benchmark/bench_all_64.sh](benchmark/bench_all_64.sh).
-Adjust this to your machine by changing the values to the `-t` parameter in `benchmark/run_*.sh`.
-You might also want to change the output paths in `benchmark/run_*.sh`
+To reproduce our experiments, compile using cmake and execute the benchmark scripts. The scripts are customised to the machines we used for our experiments.  On our Intel machine with 80 cores and 160 threads, we ran [benchmark/bench_intel.sh](benchmark/bench_intel.sh) from the build directory.  On our AMD machine with 32 cores and 64 threads, we ran [benchmark/bench_all_64.sh](benchmark/bench_all_64.sh).  Adjust these to your machine by changing the thread counts over which the scripts iterate.  You might also want to change the output paths in `benchmark/run_*.sh`
 
 **[License](/LICENSE):** GPLv3

@@ -38,7 +38,7 @@ void CheckVslError(int);
  */
 class mkl {
 public:
-    static const char* name;
+    static const char *name;
 
     //! Initialize new MKL random generator
     explicit mkl(size_t seed) {
@@ -52,11 +52,11 @@ public:
     //! non-copyable: delete copy-constructor
     mkl(const mkl &) = delete;
     //! non-copyable: delete assignment operator
-    mkl & operator = (const mkl &) = delete;
+    mkl &operator=(const mkl &) = delete;
     //! move-constructor: default
     mkl(mkl &&) = default;
     //! move-assignment operator: default
-    mkl & operator = (mkl &&) = default;
+    mkl &operator=(mkl &&) = default;
 
     //! Re-seed the random generator
     void seed(size_t seed) {
@@ -96,11 +96,11 @@ public:
         if (left_open) {
             double min = 1e-15; // still got elements == 0 with min = 1e-16
             double max = std::nextafter<double>(1.0, 2.0);
-            status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream,
-                                  count, ptr, min, max);
+            status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, count,
+                                  ptr, min, max);
         } else {
-            status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream,
-                                  count, ptr, 0.0, 1.0);
+            status = vdRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, count,
+                                  ptr, 0.0, 1.0);
         }
         CheckVslError(status);
     }
@@ -129,15 +129,14 @@ public:
         check_size(size);
         MKL_INT count = static_cast<MKL_INT>(size);
         // VSL_RNG_METHOD_UNIFORM_STD_ACCURATE?
-        int status = viRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream,
-                                  count, output, min, max + 1);
+        int status = viRngUniform(VSL_RNG_METHOD_UNIFORM_STD, stream, count,
+                                  output, min, max + 1);
         CheckVslError(status);
     }
 
     //! Generate `size` uniform integers from [min, max] (i.e., both inclusive).
     //! Unfortunately, MKL does not support generating 64-bit random integers.
-    void generate_int_block(int min, int max, std::vector<int> &output,
-                            size_t size) {
+    void generate_int_block(int min, int max, std::vector<int> &output, size_t size) {
         check_size(size);
         if (size > output.size()) {
             output.resize(size);
@@ -155,8 +154,7 @@ public:
     }
 
     //! Generate `size` geometrically distributed integers with parameter p
-    void generate_geometric_block(double p, std::vector<int> &output,
-                                  size_t size) {
+    void generate_geometric_block(double p, std::vector<int> &output, size_t size) {
         check_size(size);
         if (size > output.size()) {
             output.resize(size);
@@ -166,8 +164,8 @@ public:
 
     //! Generate `size` exponentially distributed integers with rate `lambda`
     //! and displacement `displacement`
-    void generate_exponential_block(double lambda, double *output,
-                                    size_t size, double displacement = 0) {
+    void generate_exponential_block(double lambda, double *output, size_t size,
+                                    double displacement = 0) {
         check_size(size);
 
         double scale = 1.0 / lambda;
@@ -191,12 +189,12 @@ public:
 
     //! Generate `size` normally distributed integers with mean `mean` and
     //! standard deviation `stdev`
-    void generate_gaussian_block(double mean, double stdev,
-                                 double *output, size_t size) {
+    void generate_gaussian_block(double mean, double stdev, double *output,
+                                 size_t size) {
         check_size(size);
         MKL_INT count = static_cast<MKL_INT>(size);
-        int status = vdRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, stream,
-                                   count, output, mean, stdev);
+        int status = vdRngGaussian(VSL_RNG_METHOD_GAUSSIAN_ICDF, stream, count,
+                                   output, mean, stdev);
         CheckVslError(status);
     }
 
@@ -221,8 +219,7 @@ public:
                 // random numbers, increase the blocksize to reduce RNG overhead
                 block_size_ *= 2;
             }
-            block_size_ = std::max(block_size_,
-                                   minimum_reasonable_block_size());
+            block_size_ = std::max(block_size_, minimum_reasonable_block_size());
             // generate_block takes care of resizing the vector for us
             generate_block(randblock_, block_size_);
             index_ = 0;
@@ -239,21 +236,18 @@ public:
                 // random numbers, increase the blocksize to reduce RNG overhead
                 block_size_ *= 2;
             }
-            block_size_ = std::max(block_size_,
-                                   minimum_reasonable_block_size());
+            block_size_ = std::max(block_size_, minimum_reasonable_block_size());
             // generate_log_block takes care of resizing the vector for us
             generate_log_block(randblock_, block_size_);
             index_ = 0;
             block_id_++;
         }
         return -randblock_[index_++] / lambda;
-
     }
 
     //! Generate a uniform integer from [min, max] (i.e., both inclusive)
     template <typename int_t>
-    TLX_ATTRIBUTE_ALWAYS_INLINE
-    int_t next_int(int_t min, int_t max) {
+    TLX_ATTRIBUTE_ALWAYS_INLINE int_t next_int(int_t min, int_t max) {
         return next() * (max - min + 1) + min;
     }
 
@@ -276,7 +270,7 @@ public:
     TLX_ATTRIBUTE_ALWAYS_INLINE
     double next_gaussian(double mean, double stdev) {
         double U = next(), V = next();
-        double a = stdev * std::sqrt(-2*std::log(U));
+        double a = stdev * std::sqrt(-2 * std::log(U));
         double b = 2 * M_PI * V;
 
         return mean + a * std::cos(b);
@@ -286,7 +280,7 @@ public:
     TLX_ATTRIBUTE_ALWAYS_INLINE
     std::pair<double, double> next_two_gaussians(double mean, double stdev) {
         double U = next(), V = next();
-        double a = stdev * std::sqrt(-2*std::log(U));
+        double a = stdev * std::sqrt(-2 * std::log(U));
         double b = 2 * M_PI * V;
 
         U = mean + a * std::cos(b);
@@ -303,10 +297,10 @@ public:
 private:
     //! Check that `size` fits into an MKL_INT
     bool check_size(size_t size) {
-        if (size >= std::numeric_limits<MKL_INT>::max()) {
-            LOG1
-                << "Error: MKL generator block size exceeds value range of MKL_INT:"
-                << size << " >= " << std::numeric_limits<MKL_INT>::max();
+        if (size >= static_cast<size_t>(std::numeric_limits<MKL_INT>::max())) {
+            LOG1 << "Error: MKL generator block size exceeds value range of "
+                    "MKL_INT:"
+                 << size << " >= " << std::numeric_limits<MKL_INT>::max();
             return false;
         }
         return true;
